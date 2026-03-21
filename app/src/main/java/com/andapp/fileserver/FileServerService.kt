@@ -123,12 +123,21 @@ class FileServerService : Service() {
         }
 
         private fun serveUpload(session: IHTTPSession): Response {
+            android.util.Log.d("FileServer", "Upload request received, method: ${session.method}, content type: ${session.headers["content-type"]}")
+            
             val files = HashMap<String, String>()
             try {
                 session.parseBody(files)
+                android.util.Log.d("FileServer", "parseBody completed, files map size: ${files.size}")
+                android.util.Log.d("FileServer", "Parameters: ${session.parameters}")
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error parsing upload", e)
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload: ${escapeJson(e.message ?: "")}"}""")
+            }
+
+            if (files.isEmpty()) {
+                android.util.Log.w("FileServer", "No files received in upload request")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No files received"}""")
             }
 
             val uploadPath = session.parameters["path"]?.firstOrNull()
@@ -669,6 +678,10 @@ class FileServerService : Service() {
             
             const formData = new FormData();
             formData.append('path', currentPath || '');
+            
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file' + i, files[i], files[i].name);
+            }
             
             try {
                 const url = '/upload?path=' + encodeURIComponent(currentPath || '');
