@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">文件服务器</string>
+    <string name="start_server">启动服务器</string>
+    <string name="stop_server">停止服务器</string>
+    <string name="server_status">服务器状态: %s</string>
+    <string name="server_address">访问地址: %s</string>
+    <string name="server_running">运行中</string>
+    <string name="server_stopped">已停止</string>
+    <string name="root_path">根路径: %s</string>
+    <string name="permission_required">需要存储权限才能运行</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="permission_granted">权限已授予</string>
+    <string name="permission_denied">需要存储权限才能运行服务器</string>
+    <string name="server_running_status">服务器运行中，端口: 8080</string>
+    <string name="server_stopped_status">服务器已停止</string>
+</resources>

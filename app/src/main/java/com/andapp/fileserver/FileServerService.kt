@@ -1,0 +1,418 @@
+package com.andapp.fileserver
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Intent
+import android.os.Binder
+import android.os.Build
+import android.os.Environment
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import fi.iki.elonen.NanoHTTPD
+import java.io.File
+import java.io.FileInputStream
+import java.net.URLEncoder
+
+class FileServerService : Service() {
+
+    private var server: FileHttpServer? = null
+    private val binder = LocalBinder()
+    private var serverPort = 8080
+
+    inner class LocalBinder : Binder() {
+        fun getService(): FileServerService = this@FileServerService
+    }
+
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(1, createNotification())
+        startServer()
+        return START_STICKY
+    }
+
+    override fun onDestroy() {
+        stopServer()
+        super.onDestroy()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "file_server_channel",
+                "File Server",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createNotification(): Notification {
+        return NotificationCompat.Builder(this, "file_server_channel")
+            .setContentTitle("File Server")
+            .setContentText("Server is running on port $serverPort")
+            .setSmallIcon(android.R.drawable.ic_menu_upload)
+            .build()
+    }
+
+    fun startServer() {
+        if (server == null) {
+            server = FileHttpServer(serverPort)
+            server?.start()
+        }
+    }
+
+    fun stopServer() {
+        server?.stop()
+        server = null
+    }
+
+    fun isServerRunning(): Boolean = server?.isAlive == true
+
+    fun getServerPort(): Int = serverPort
+
+    inner class FileHttpServer(port: Int) : NanoHTTPD(port) {
+
+        override fun serve(session: IHTTPSession): Response {
+            val uri = session.uri
+            val decodedUri = java.net.URLDecoder.decode(uri, "UTF-8")
+            
+            return when {
+                decodedUri == "/" -> serveIndex()
+                decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
+                decodedUri.startsWith("/api/files") -> serveFileList(decodedUri)
+                else -> serveFile(decodedUri)
+            }
+        }
+
+        private fun serveIndex(): Response {
+            val html = generateIndexHtml()
+            return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        }
+
+        private fun serveDownload(uri: String): Response {
+            val filePath = uri.removePrefix("/download/")
+            val file = File(filePath)
+            
+            if (!file.exists() || !file.canRead()) {
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "File not found")
+            }
+
+            val fis = FileInputStream(file)
+            val mimeType = getMimeType(file.name)
+            val encodedName = URLEncoder.encode(file.name, "UTF-8").replace("+", "%20")
+            
+            val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
+            response.addHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedName")
+            return response
+        }
+
+        private fun serveFileList(uri: String): Response {
+            val path = uri.substringAfter("/api/files?path=").let {
+                if (it == uri) {
+                    Environment.getExternalStorageDirectory().absolutePath
+                } else {
+                    java.net.URLDecoder.decode(it, "UTF-8")
+                }
+            }
+            
+            val dir = File(path)
+            if (!dir.exists() || !dir.isDirectory) {
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", "[]")
+            }
+
+            val files = dir.listFiles()?.filter { it.canRead() }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
+            
+            val json = buildString {
+                append("[")
+                files.forEachIndexed { index, file ->
+                    if (index > 0) append(",")
+                    append("""{"name":"${escapeJson(file.name)}","path":"${escapeJson(file.absolutePath)}","isDirectory":${file.isDirectory},"size":${file.length()},"lastModified":${file.lastModified()}}""")
+                }
+                append("]")
+            }
+
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        }
+
+        private fun serveFile(uri: String): Response {
+            val file = File(uri)
+            
+            if (!file.exists() || !file.canRead()) {
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "File not found")
+            }
+
+            if (file.isDirectory) {
+                return serveIndex()
+            }
+
+            val fis = FileInputStream(file)
+            val mimeType = getMimeType(file.name)
+            return newChunkedResponse(Response.Status.OK, mimeType, fis)
+        }
+
+        private fun getMimeType(fileName: String): String {
+            return when {
+                fileName.endsWith(".html") || fileName.endsWith(".htm") -> "text/html"
+                fileName.endsWith(".css") -> "text/css"
+                fileName.endsWith(".js") -> "application/javascript"
+                fileName.endsWith(".json") -> "application/json"
+                fileName.endsWith(".png") -> "image/png"
+                fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") -> "image/jpeg"
+                fileName.endsWith(".gif") -> "image/gif"
+                fileName.endsWith(".pdf") -> "application/pdf"
+                fileName.endsWith(".txt") -> "text/plain"
+                fileName.endsWith(".mp3") -> "audio/mpeg"
+                fileName.endsWith(".mp4") -> "video/mp4"
+                fileName.endsWith(".zip") -> "application/zip"
+                fileName.endsWith(".apk") -> "application/vnd.android.package-archive"
+                else -> "application/octet-stream"
+            }
+        }
+
+        private fun escapeJson(str: String): String {
+            return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+        }
+
+        private fun generateIndexHtml(): String {
+            return """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .breadcrumb {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .breadcrumb a {
+            color: #1976d2;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb span {
+            color: #666;
+        }
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        .file-item:hover {
+            background: #f8f9fa;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-right: 15px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .file-name:hover {
+            color: #1976d2;
+        }
+        .file-meta {
+            color: #999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        .btn-download {
+            background: #1976d2;
+            color: white;
+        }
+        .btn-download:hover {
+            background: #1565c0;
+        }
+        .empty {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+        }
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 File Server</h1>
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="file-list" id="fileList">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+    
+    <script>
+        let currentPath = '';
+        
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatDate(timestamp) {
+            return new Date(timestamp).toLocaleString();
+        }
+        
+        function getIcon(file) {
+            if (file.isDirectory) return '📁';
+            const ext = file.name.split('.').pop().toLowerCase();
+            const icons = {
+                'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+                'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵',
+                'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬',
+                'pdf': '📄', 'doc': '📄', 'docx': '📄',
+                'xls': '📊', 'xlsx': '📊',
+                'zip': '📦', 'rar': '📦', '7z': '📦',
+                'apk': '📱',
+                'txt': '📝', 'md': '📝'
+            };
+            return icons[ext] || '📄';
+        }
+        
+        function renderBreadcrumb(path) {
+            const parts = path ? path.split('/') : [];
+            let html = '<a href="#" onclick="loadFiles(\\'\\')">🏠 Root</a>';
+            let currentPath = '';
+            
+            parts.forEach((part, index) => {
+                if (part) {
+                    currentPath += '/' + part;
+                    html += ' / <a href="#" onclick="loadFiles(\\\'' + currentPath + '\\\')">' + part + '</a>';
+                }
+            });
+            
+            document.getElementById('breadcrumb').innerHTML = html;
+        }
+        
+        async function loadFiles(path = '') {
+            currentPath = path;
+            renderBreadcrumb(path);
+            
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<div class="loading">Loading...</div>';
+            
+            try {
+                const response = await fetch('/api/files?path=' + encodeURIComponent(path));
+                const files = await response.json();
+                
+                if (files.length === 0) {
+                    fileList.innerHTML = '<div class="empty">No files found</div>';
+                    return;
+                }
+                
+                let html = '';
+                files.forEach(file => {
+                    html += `
+                        <div class="file-item">
+                            <div class="file-icon">${getIcon(file)}</div>
+                            <div class="file-info">
+                                ${file.isDirectory 
+                                    ? `<a class="file-name" href="#" onclick="loadFiles('${file.path}')">${file.name}</a>`
+                                    : `<span class="file-name">${file.name}</span>`
+                                }
+                                <div class="file-meta">
+                                    ${file.isDirectory ? 'Folder' : formatSize(file.size)} • ${formatDate(file.lastModified)}
+                                </div>
+                            </div>
+                            ${!file.isDirectory ? `
+                                <div class="file-actions">
+                                    <a class="btn btn-download" href="/download/${file.path}" download>Download</a>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                fileList.innerHTML = html;
+            } catch (error) {
+                fileList.innerHTML = '<div class="empty">Error loading files: ' + error.message + '</div>';
+            }
+        }
+        
+        loadFiles();
+    </script>
+</body>
+</html>
+            """.trimIndent()
+        }
+    }
+}
