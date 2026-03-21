@@ -138,7 +138,6 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (checkPermissions()) {
             checkServiceStatus()
-            toggleButton.text = if (isServiceRunning) "停止服务器" else "启动服务器"
         }
     }
 
