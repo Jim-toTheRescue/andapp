@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 101
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
         toggleButton.setOnClickListener {
             if (checkPermissions()) {
+                requestNotificationPermission()
                 if (isServiceRunning) {
                     stopService()
                 } else {
@@ -52,6 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         if (checkPermissions()) {
             checkServiceStatus()
+            requestNotificationPermission()
         } else {
             statusText.text = "需要存储权限才能运行"
             toggleButton.text = "授予权限"
@@ -70,6 +73,22 @@ class MainActivity : AppCompatActivity() {
                 this,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
             ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
         }
     }
 
@@ -107,6 +126,7 @@ class MainActivity : AppCompatActivity() {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 Toast.makeText(this, "权限已授予", Toast.LENGTH_SHORT).show()
                 checkServiceStatus()
+                requestNotificationPermission()
             } else {
                 Toast.makeText(this, "需要存储权限才能运行服务器", Toast.LENGTH_LONG).show()
             }

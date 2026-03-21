@@ -34,7 +34,9 @@ class FileServerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1, createNotification())
-        startServer()
+        Thread {
+            startServer()
+        }.start()
         return START_STICKY
     }
 
@@ -64,9 +66,13 @@ class FileServerService : Service() {
     }
 
     fun startServer() {
-        if (server == null) {
-            server = FileHttpServer(serverPort)
-            server?.start()
+        try {
+            if (server == null) {
+                server = FileHttpServer(serverPort)
+                server?.start()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
