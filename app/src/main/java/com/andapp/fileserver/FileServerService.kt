@@ -94,6 +94,7 @@ class FileServerService : Service() {
             return when {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
+                decodedUri.startsWith("/stream/") -> serveStream(decodedUri)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
             }
@@ -118,6 +119,22 @@ class FileServerService : Service() {
             
             val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
             response.addHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedName")
+            return response
+        }
+
+        private fun serveStream(uri: String): Response {
+            val filePath = uri.removePrefix("/stream/")
+            val file = File(filePath)
+            
+            if (!file.exists() || !file.canRead()) {
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "File not found")
+            }
+
+            val fis = FileInputStream(file)
+            val mimeType = getMimeType(file.name)
+            
+            val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
+            response.addHeader("Accept-Ranges", "bytes")
             return response
         }
 
@@ -331,6 +348,13 @@ class FileServerService : Service() {
         .btn-download:hover {
             background: #1565c0;
         }
+        .btn-view {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-view:hover {
+            background: #388e3c;
+        }
         .empty {
             padding: 40px;
             text-align: center;
@@ -445,7 +469,14 @@ class FileServerService : Service() {
                     html += '</div>';
                     html += '</div>';
                     if (!isDir) {
+                        const ext = name.split('.').pop().toLowerCase();
+                        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'ogg', 'avi', 'mkv', 'mov'];
+                        const isMedia = mediaExts.includes(ext);
+                        
                         html += '<div class="file-actions">';
+                        if (isMedia) {
+                            html += '<a class="btn btn-view" href="/stream/' + filePath + '" target="_blank">View</a>';
+                        }
                         html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
                         html += '</div>';
                     }
