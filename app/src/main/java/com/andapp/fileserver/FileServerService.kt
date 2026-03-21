@@ -94,7 +94,6 @@ class FileServerService : Service() {
             return when {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
-                decodedUri.startsWith("/stream/") -> serveStream(decodedUri)
                 decodedUri == "/upload" && session.method == Method.POST -> serveUpload(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
@@ -120,22 +119,6 @@ class FileServerService : Service() {
             
             val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
             response.addHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedName")
-            return response
-        }
-
-        private fun serveStream(uri: String): Response {
-            val filePath = uri.removePrefix("/stream/")
-            val file = File(filePath)
-            
-            if (!file.exists() || !file.canRead()) {
-                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "File not found")
-            }
-
-            val fis = FileInputStream(file)
-            val mimeType = getMimeType(file.name)
-            
-            val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
-            response.addHeader("Accept-Ranges", "bytes")
             return response
         }
 
@@ -567,7 +550,7 @@ class FileServerService : Service() {
                     if (isDir) {
                         html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
-                        html += '<a class="file-name" href="/stream/' + filePath + '" target="_blank">' + name + '</a>';
+                        html += '<a class="file-name" href="' + filePath + '" target="_blank">' + name + '</a>';
                     }
                     html += '<div class="file-meta">';
                     html += isDir ? 'Folder' : size;
