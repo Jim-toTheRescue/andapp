@@ -131,13 +131,13 @@ class FileServerService : Service() {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload"}""")
             }
 
-            val uploadPath = session.queryParameterRaw("path")
+            val uploadPath = session.parameters["path"]?.firstOrNull()
             android.util.Log.d("FileServer", "Upload path param: $uploadPath")
             
             val targetPath = if (uploadPath.isNullOrEmpty()) {
                 Environment.getExternalStorageDirectory().absolutePath
             } else {
-                java.net.URLDecoder.decode(uploadPath, "UTF-8")
+                uploadPath
             }
             
             android.util.Log.d("FileServer", "Upload target: $targetPath")
