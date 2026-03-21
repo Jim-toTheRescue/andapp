@@ -78,8 +78,8 @@ class FileServerService : Service() {
         try {
             if (server == null) {
                 server = FileHttpServer(serverPort)
-                // 设置超时时间为 1 小时，支持大文件上传
-                server?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
+                // 0 = 无超时限制，支持大文件上传
+                server?.start(0, false)
             }
         } catch (e: Exception) {
             e.printStackTrace()
