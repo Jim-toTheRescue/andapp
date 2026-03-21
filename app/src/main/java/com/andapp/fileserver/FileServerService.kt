@@ -21,6 +21,15 @@ class FileServerService : Service() {
     private val binder = LocalBinder()
     private var serverPort = 8080
 
+    companion object {
+        val errorLog = mutableListOf<String>()
+        fun addLog(msg: String) {
+            val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+            errorLog.add(0, "[$time] $msg")
+            if (errorLog.size > 50) errorLog.removeLast()
+        }
+    }
+
     inner class LocalBinder : Binder() {
         fun getService(): FileServerService = this@FileServerService
     }
@@ -191,6 +200,7 @@ class FileServerService : Service() {
         
         private fun serveUploadChunk(session: IHTTPSession): Response {
             try {
+                addLog("收到上传请求")
                 val fileName = session.parameters["filename"]?.firstOrNull()?.let {
                     java.net.URLDecoder.decode(it, "UTF-8")
                 } ?: return errorResponse("Missing filename")
@@ -198,31 +208,43 @@ class FileServerService : Service() {
                 val chunkIndex = session.parameters["chunk"]?.firstOrNull()?.toIntOrNull() ?: 0
                 val isLast = session.parameters["last"]?.firstOrNull() == "true"
                 
+                addLog("文件名: $fileName, 块: $chunkIndex, 路径: $uploadPath")
+                
                 val targetPath = determineUploadTargetPath(uploadPath)
                 val targetDir = File(targetPath)
                 
+                addLog("目标目录: $targetPath, 存在: ${targetDir.exists()}, 可写: ${targetDir.canWrite()}")
+                
                 if (!targetDir.exists()) {
+                    addLog("错误: 目录不存在")
                     return errorResponse("Directory not exists: $targetPath")
                 }
                 if (!targetDir.canWrite()) {
+                    addLog("错误: 目录不可写")
                     return errorResponse("Cannot write to: $targetPath")
                 }
                 
                 val targetFile = File(targetDir, fileName)
+                addLog("开始写入文件: ${targetFile.absolutePath}")
                 
                 java.io.FileOutputStream(targetFile, chunkIndex > 0).use { output ->
+                    var totalBytes = 0
                     session.inputStream.use { input ->
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
+                            totalBytes += bytesRead
                         }
                     }
+                    addLog("写入完成: $totalBytes 字节")
                 }
                 
+                addLog("上传成功")
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
                     
             } catch (e: Exception) {
+                addLog("异常: ${e.javaClass.simpleName}: ${e.message}")
                 return errorResponse("${e.javaClass.simpleName}: ${e.message}")
             }
         }

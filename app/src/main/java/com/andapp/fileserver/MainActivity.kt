@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toggleButton: Button
     private lateinit var loadingProgress: ProgressBar
     private lateinit var hintText: TextView
+    private lateinit var logText: TextView
     private var isServiceRunning = false
     private var isTransitioning = false
 
@@ -46,6 +47,16 @@ class MainActivity : AppCompatActivity() {
         toggleButton = findViewById(R.id.toggleButton)
         loadingProgress = findViewById(R.id.loadingProgress)
         hintText = findViewById(R.id.hintText)
+        logText = findViewById(R.id.logText)
+
+        // 定时刷新日志
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                refreshLog()
+                handler.postDelayed(this, 1000)
+            }
+        }, 1000)
 
         toggleButton.setOnClickListener {
             if (isTransitioning) return@setOnClickListener
@@ -210,6 +221,14 @@ class MainActivity : AppCompatActivity() {
     private fun hideLoading() {
         loadingProgress.visibility = android.view.View.GONE
         toggleButton.isEnabled = true
+    }
+
+    private fun refreshLog() {
+        if (FileServerService.errorLog.isEmpty()) {
+            logText.text = if (isServiceRunning) "等待请求..." else "服务器未运行"
+        } else {
+            logText.text = FileServerService.errorLog.joinToString("\n")
+        }
     }
 
     private fun checkServiceStatus() {
