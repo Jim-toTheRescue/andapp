@@ -131,19 +131,25 @@ class FileServerService : Service() {
                 java.net.URLDecoder.decode(it, "UTF-8")
             } ?: "upload_${System.currentTimeMillis()}"
             
+            android.util.Log.d("FileServer", "Upload path: $uploadPath, filename: $fileName")
+            
             // 确定目标目录
             val targetPath = determineUploadTargetPath(uploadPath)
+            android.util.Log.d("FileServer", "Target path: $targetPath")
+            
             val targetDir = File(targetPath)
             if (!targetDir.exists()) {
                 targetDir.mkdirs()
             }
             
             if (!targetDir.canWrite()) {
+                android.util.Log.e("FileServer", "Cannot write to: $targetPath")
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", 
                     """{"error":"无法写入目录: ${escapeJson(targetPath)}"}""")
             }
             
             val targetFile = File(targetDir, fileName)
+            android.util.Log.d("FileServer", "Target file: ${targetFile.absolutePath}")
             
             try {
                 // 流式写入：直接从输入流写入文件，不加载到内存
@@ -162,8 +168,12 @@ class FileServerService : Service() {
                 
                 android.util.Log.d("FileServer", "Upload completed: ${targetFile.absolutePath}, size: $totalBytes")
                 
-                // 通知系统扫描新文件
-                notifyMediaScanner(targetFile)
+                // 通知系统扫描新文件（可能失败但不影响上传结果）
+                try {
+                    notifyMediaScanner(targetFile)
+                } catch (e: Exception) {
+                    android.util.Log.w("FileServer", "MediaScanner notification failed", e)
+                }
                 
                 val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":["${escapeJson(fileName)}"],"size":$totalBytes}"""
                 return newFixedLengthResponse(Response.Status.OK, "application/json", json)
@@ -173,7 +183,7 @@ class FileServerService : Service() {
                 if (targetFile.exists()) {
                     targetFile.delete()
                 }
-                android.util.Log.e("FileServer", "Upload failed", e)
+                android.util.Log.e("FileServer", "Upload failed: ${e.javaClass.simpleName}", e)
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", 
                     """{"error":"上传失败: ${escapeJson(e.message ?: "未知错误")}"}""")
             }
