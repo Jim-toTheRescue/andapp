@@ -452,6 +452,15 @@ class FileServerService : Service() {
                 fileName.endsWith(".txt") -> "text/plain"
                 fileName.endsWith(".mp3") -> "audio/mpeg"
                 fileName.endsWith(".mp4") -> "video/mp4"
+                fileName.endsWith(".mkv") -> "video/x-matroska"
+                fileName.endsWith(".avi") -> "video/x-msvideo"
+                fileName.endsWith(".webm") -> "video/webm"
+                fileName.endsWith(".mov") -> "video/quicktime"
+                fileName.endsWith(".wmv") -> "video/x-ms-wmv"
+                fileName.endsWith(".flv") -> "video/x-flv"
+                fileName.endsWith(".m4v") -> "video/x-m4v"
+                fileName.endsWith(".3gp") -> "video/3gpp"
+                fileName.endsWith(".ogv") -> "video/ogg"
                 fileName.endsWith(".zip") -> "application/zip"
                 fileName.endsWith(".apk") -> "application/vnd.android.package-archive"
                 else -> "application/octet-stream"
@@ -639,7 +648,7 @@ class FileServerService : Service() {
 <body>
     <div class="drop-overlay" id="dropOverlay">释放文件以上传</div>
     <div class="container">
-        <h1>📁 File Server</h1>
+        <h1>🤖 File Server</h1>
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="upload-bar">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
@@ -673,7 +682,7 @@ class FileServerService : Service() {
             const icons = {
                 'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
                 'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵',
-                'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬',
+                'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬', 'webm': '🎬', 'mov': '🎬', 'wmv': '🎬', 'flv': '🎬', 'm4v': '🎬', '3gp': '🎬', 'ogv': '🎬',
                 'pdf': '📄', 'doc': '📄', 'docx': '📄',
                 'xls': '📊', 'xlsx': '📊',
                 'zip': '📦', 'rar': '📦', '7z': '📦',
