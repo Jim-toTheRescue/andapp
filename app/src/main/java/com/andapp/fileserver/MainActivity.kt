@@ -179,12 +179,6 @@ class MainActivity : AppCompatActivity() {
             isTransitioning = false
             hideLoading()
             updateUI()
-            
-            if (isServiceRunning) {
-                Toast.makeText(this@MainActivity, "服务器已启动", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this@MainActivity, "启动失败，请重试", Toast.LENGTH_SHORT).show()
-            }
         }
     }
 
@@ -201,7 +195,6 @@ class MainActivity : AppCompatActivity() {
             isTransitioning = false
             hideLoading()
             updateUI()
-            Toast.makeText(this@MainActivity, "服务器已停止", Toast.LENGTH_SHORT).show()
         }
     }
 
