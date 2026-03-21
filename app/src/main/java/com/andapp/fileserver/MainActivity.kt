@@ -1,6 +1,8 @@
 package com.andapp.fileserver
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -18,9 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
 import java.net.NetworkInterface
-import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
@@ -160,21 +160,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkServiceStatus() {
-        lifecycleScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    val url = URL("http://localhost:8080")
-                    val connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 1000
-                    connection.connect()
-                    connection.disconnect()
-                }
-                isServiceRunning = true
-            } catch (e: Exception) {
-                isServiceRunning = false
+        isServiceRunning = isServiceRunning(FileServerService::class.java)
+        updateUI()
+    }
+
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        for (service in manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
             }
-            updateUI()
         }
+        return false
     }
 
     private fun updateUI() {
