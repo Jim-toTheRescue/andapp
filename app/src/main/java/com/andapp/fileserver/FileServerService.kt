@@ -387,13 +387,13 @@ class FileServerService : Service() {
         
         function renderBreadcrumb(path) {
             const parts = path ? path.split('/') : [];
-            let html = '<a href="#" onclick="loadFiles(\\'\\')">🏠 Root</a>';
+            let html = "<a href=\"#\" onclick=\"loadFiles('')\">🏠 Root</a>";
             let currentPath = '';
             
             parts.forEach((part, index) => {
                 if (part) {
                     currentPath += '/' + part;
-                    html += ' / <a href="#" onclick="loadFiles(\\\'' + currentPath + '\\\')">' + part + '</a>';
+                    html += " / <a href=\"#\" onclick=\"loadFiles('" + currentPath + "')\">" + part + "</a>";
                 }
             });
             
@@ -437,7 +437,7 @@ class FileServerService : Service() {
                     html += '<div class="file-icon">' + icon + '</div>';
                     html += '<div class="file-info">';
                     if (isDir) {
-                        html += '<a class="file-name" href="#" onclick="loadFiles(\\'' + filePath + '\\')">' + name + '</a>';
+                        html += "<a class=\"file-name\" href=\"#\" onclick=\"loadFiles('" + filePath + "')\">" + name + "</a>";
                     } else {
                         html += '<span class="file-name">' + name + '</span>';
                     }
