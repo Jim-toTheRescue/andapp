@@ -148,11 +148,30 @@ class FileServerService : Service() {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload"}""")
             }
 
-            val uploadPath = session.parameters["path"]?.firstOrNull() ?: Environment.getExternalStorageDirectory().absolutePath
-            val targetDir = File(uploadPath)
+            val uploadPath = session.parameters["path"]?.firstOrNull()
+            android.util.Log.d("FileServer", "Upload path param: $uploadPath")
             
-            if (!targetDir.exists() || !targetDir.isDirectory) {
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Target directory not found"}""")
+            val targetPath = if (uploadPath.isNullOrEmpty()) {
+                Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                java.net.URLDecoder.decode(uploadPath, "UTF-8")
+            }
+            
+            android.util.Log.d("FileServer", "Upload target: $targetPath")
+            
+            val targetDir = File(targetPath)
+            
+            if (!targetDir.exists()) {
+                android.util.Log.e("FileServer", "Directory does not exist: $targetPath")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Directory not found: $targetPath"}""")
+            }
+            if (!targetDir.isDirectory) {
+                android.util.Log.e("FileServer", "Not a directory: $targetPath")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Not a directory: $targetPath"}""")
+            }
+            if (!targetDir.canWrite()) {
+                android.util.Log.e("FileServer", "Cannot write to: $targetPath")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No write permission: $targetPath"}""")
             }
 
             val uploadedFiles = mutableListOf<String>()
