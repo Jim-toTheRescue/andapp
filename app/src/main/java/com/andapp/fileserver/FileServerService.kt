@@ -131,13 +131,7 @@ class FileServerService : Service() {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload"}""")
             }
 
-            val uploadPath = session.queryStringString?.let { qs ->
-                val params = qs.split("&").associate { 
-                    val parts = it.split("=", limit = 2)
-                    if (parts.size == 2) parts[0] to parts[1] else parts[0] to ""
-                }
-                params["path"]
-            }
+            val uploadPath = session.queryParameterRaw("path")
             android.util.Log.d("FileServer", "Upload path param: $uploadPath")
             
             val targetPath = if (uploadPath.isNullOrEmpty()) {
