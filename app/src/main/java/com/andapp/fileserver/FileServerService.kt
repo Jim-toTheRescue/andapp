@@ -205,7 +205,7 @@ class FileServerService : Service() {
             
             try {
                 // 第一个块覆盖写，后续块追加写
-                FileOutputStream(targetFile, chunkIndex > 0).use { output ->
+                java.io.FileOutputStream(targetFile, chunkIndex > 0).use { output ->
                     session.inputStream.use { input ->
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
