@@ -134,20 +134,8 @@ class FileServerService : Service() {
             val uploadPath = session.parameters["path"]?.firstOrNull()
             android.util.Log.d("FileServer", "Upload path param: $uploadPath")
             
-            // 使用应用私有目录确保可写
-            val targetPath = if (uploadPath.isNullOrEmpty()) {
-                getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath
-            } else {
-                // 检查目标目录是否可写，不可写则使用应用目录
-                val targetDir = File(uploadPath)
-                if (targetDir.canWrite()) {
-                    uploadPath
-                } else {
-                    android.util.Log.w("FileServer", "Cannot write to $uploadPath, using app private dir")
-                    getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath
-                }
-            }
-            
+            // 确定目标目录
+            val targetPath = determineUploadTargetPath(uploadPath)
             android.util.Log.d("FileServer", "Upload target: $targetPath")
             
             val targetDir = File(targetPath)
@@ -169,21 +157,27 @@ class FileServerService : Service() {
                 val tempFile = File(tempPath)
                 if (tempFile.exists()) {
                     android.util.Log.d("FileServer", "Temp file exists, size: ${tempFile.length()}")
-                    // 尝试从参数中获取原始文件名
+                    
+                    // 获取原始文件名
                     val originalName = session.parameters[key]?.firstOrNull()
                     android.util.Log.d("FileServer", "Original name from params: $originalName")
+                    
                     val fileName = if (!originalName.isNullOrEmpty() && originalName != key && !originalName.contains("/")) {
-                        originalName
+                        java.net.URLDecoder.decode(originalName, "UTF-8")
                     } else {
-                        // 使用带时间戳的文件名避免冲突
-                        "upload_${System.currentTimeMillis()}_${tempFile.name}"
+                        tempFile.name
                     }
+                    
                     val targetFile = File(targetDir, fileName)
                     
                     try {
                         tempFile.copyTo(targetFile, overwrite = true)
                         uploadedFiles.add(fileName)
                         android.util.Log.d("FileServer", "Uploaded: ${targetFile.absolutePath}, size: ${targetFile.length()}")
+                        
+                        // 通知系统扫描新文件
+                        notifyMediaScanner(targetFile)
+                        
                     } catch (e: Exception) {
                         android.util.Log.e("FileServer", "Error copying file: $fileName", e)
                     }
@@ -194,6 +188,78 @@ class FileServerService : Service() {
 
             val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        }
+        
+        private fun determineUploadTargetPath(uploadPath: String?): String {
+            // 如果没有指定路径，使用应用私有目录
+            if (uploadPath.isNullOrEmpty()) {
+                return getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath 
+                    ?: filesDir.absolutePath
+            }
+            
+            val targetDir = File(uploadPath)
+            
+            // 检查目录是否存在且可写
+            if (targetDir.exists() && targetDir.canWrite()) {
+                return uploadPath
+            }
+            
+            // 如果目标路径不可写，检查是否是外部存储根目录
+            val externalRoot = Environment.getExternalStorageDirectory().absolutePath
+            if (uploadPath.startsWith(externalRoot)) {
+                // 尝试使用应用私有目录下的对应子目录
+                val relativePath = uploadPath.removePrefix(externalRoot).removePrefix("/")
+                val appDir = getExternalFilesDir(null)
+                if (appDir != null) {
+                    val fallbackDir = File(appDir, relativePath)
+                    fallbackDir.mkdirs()
+                    if (fallbackDir.canWrite()) {
+                        android.util.Log.w("FileServer", "Using app private dir: ${fallbackDir.absolutePath}")
+                        return fallbackDir.absolutePath
+                    }
+                }
+            }
+            
+            // 最终回退到应用下载目录
+            return getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath 
+                ?: filesDir.absolutePath
+        }
+        
+        private fun notifyMediaScanner(file: File) {
+            try {
+                val mimeType = getMimeType(file.name)
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, file.name)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, file.parent?.removePrefix(Environment.getExternalStorageDirectory().absolutePath)?.removePrefix("/") ?: "")
+                }
+                
+                val uri = if (mimeType.startsWith("image/")) {
+                    contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                } else if (mimeType.startsWith("video/")) {
+                    contentResolver.insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                } else if (mimeType.startsWith("audio/")) {
+                    contentResolver.insert(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+                } else {
+                    contentResolver.insert(android.provider.MediaStore.Files.getContentUri("external"), values)
+                }
+                
+                uri?.let {
+                    contentResolver.openOutputStream(it)?.use { os ->
+                        file.inputStream().use { it.copyTo(os) }
+                    }
+                    android.util.Log.d("FileServer", "MediaStore synced: $uri")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("FileServer", "MediaStore sync failed, using MediaScannerConnection", e)
+                // 回退到 MediaScannerConnection
+                android.media.MediaScannerConnection.scanFile(
+                    applicationContext,
+                    arrayOf(file.absolutePath),
+                    arrayOf(getMimeType(file.name)),
+                    null
+                )
+            }
         }
 
         private fun serveFileList(session: IHTTPSession): Response {
