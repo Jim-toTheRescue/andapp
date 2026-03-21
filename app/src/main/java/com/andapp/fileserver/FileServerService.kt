@@ -511,9 +511,14 @@ class FileServerService : Service() {
             document.getElementById('breadcrumb').innerHTML = html;
         }
         
-        async function loadFiles(path = '') {
+        async function loadFiles(path = '', pushState = true) {
             currentPath = path;
             renderBreadcrumb(path);
+            
+            if (pushState) {
+                const newUrl = path ? '/?path=' + encodeURIComponent(path) : '/';
+                history.pushState({ path: path }, '', newUrl);
+            }
             
             const fileList = document.getElementById('fileList');
             fileList.innerHTML = '<div class="loading">Loading...</div>';
@@ -622,7 +627,13 @@ class FileServerService : Service() {
             uploadFiles(e.dataTransfer.files);
         });
         
-        loadFiles();
+        window.addEventListener('popstate', (e) => {
+            const path = (e.state && e.state.path) || new URLSearchParams(window.location.search).get('path') || '';
+            loadFiles(path, false);
+        });
+        
+        const initialPath = new URLSearchParams(window.location.search).get('path') || '';
+        loadFiles(initialPath, false);
     </script>
 </body>
 </html>
