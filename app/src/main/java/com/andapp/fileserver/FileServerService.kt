@@ -96,8 +96,6 @@ class FileServerService : Service() {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
                 decodedUri == "/upload/chunk" -> serveUploadChunk(session)
-                decodedUri == "/upload/merge" -> serveUploadMerge(session)
-                decodedUri == "/upload" -> serveUpload(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
             }
@@ -191,21 +189,24 @@ class FileServerService : Service() {
             }
         }
         
-        private fun getChunkDir(): File {
-            val dir = File(cacheDir, "upload_chunks")
-            if (!dir.exists()) dir.mkdirs()
-            return dir
-        }
-        
         private fun serveUploadChunk(session: IHTTPSession): Response {
-            val fileId = session.parameters["fileId"]?.firstOrNull() ?: return errorResponse("Missing fileId")
-            val chunkIndex = session.parameters["chunkIndex"]?.firstOrNull()?.toIntOrNull() ?: return errorResponse("Missing chunkIndex")
+            val fileName = session.parameters["filename"]?.firstOrNull()?.let {
+                java.net.URLDecoder.decode(it, "UTF-8")
+            } ?: return errorResponse("Missing filename")
+            val uploadPath = session.parameters["path"]?.firstOrNull()
+            val chunkIndex = session.parameters["chunk"]?.firstOrNull()?.toIntOrNull() ?: 0
+            val isLast = session.parameters["last"]?.firstOrNull() == "true"
             
-            val chunkFile = File(getChunkDir(), "${fileId}_${chunkIndex}")
+            val targetPath = determineUploadTargetPath(uploadPath)
+            val targetDir = File(targetPath)
+            if (!targetDir.exists()) targetDir.mkdirs()
+            
+            val targetFile = File(targetDir, fileName)
             
             try {
-                session.inputStream.use { input ->
-                    chunkFile.outputStream().use { output ->
+                // 第一个块覆盖写，后续块追加写
+                FileOutputStream(targetFile, chunkIndex > 0).use { output ->
+                    session.inputStream.use { input ->
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
                         while (input.read(buffer).also { bytesRead = it } != -1) {
@@ -213,54 +214,19 @@ class FileServerService : Service() {
                         }
                     }
                 }
+                
+                // 最后一个块上传完成，通知系统
+                if (isLast) {
+                    notifyMediaScanner(targetFile)
+                }
+                
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
-            } catch (e: Exception) {
-                chunkFile.delete()
-                return errorResponse(e.message ?: "Chunk upload failed")
-            }
-        }
-        
-        private fun serveUploadMerge(session: IHTTPSession): Response {
-            val fileId = session.parameters["fileId"]?.firstOrNull() ?: return errorResponse("Missing fileId")
-            val fileName = session.parameters["fileName"]?.firstOrNull()?.let {
-                java.net.URLDecoder.decode(it, "UTF-8")
-            } ?: return errorResponse("Missing fileName")
-            val totalChunks = session.parameters["totalChunks"]?.firstOrNull()?.toIntOrNull() ?: return errorResponse("Missing totalChunks")
-            val uploadPath = session.parameters["path"]?.firstOrNull()
-            
-            val targetPath = determineUploadTargetPath(uploadPath)
-            val targetDir = File(targetPath)
-            if (!targetDir.exists()) targetDir.mkdirs()
-            
-            val targetFile = File(targetDir, fileName)
-            val chunkDir = getChunkDir()
-            
-            try {
-                targetFile.outputStream().use { output ->
-                    for (i in 0 until totalChunks) {
-                        val chunkFile = File(chunkDir, "${fileId}_${i}")
-                        if (!chunkFile.exists()) {
-                            return errorResponse("Missing chunk $i")
-                        }
-                        chunkFile.inputStream().use { input ->
-                            input.copyTo(output)
-                        }
-                    }
-                }
-                
-                // 清理临时块
-                for (i in 0 until totalChunks) {
-                    File(chunkDir, "${fileId}_${i}").delete()
-                }
-                
-                notifyMediaScanner(targetFile)
-                
-                return newFixedLengthResponse(Response.Status.OK, "application/json", 
-                    """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":["${escapeJson(fileName)}"]}""")
                     
             } catch (e: Exception) {
-                targetFile.delete()
-                return errorResponse(e.message ?: "Merge failed")
+                if (chunkIndex == 0 && targetFile.exists()) {
+                    targetFile.delete()
+                }
+                return errorResponse(e.message ?: "Upload failed")
             }
         }
         
@@ -757,6 +723,7 @@ class FileServerService : Service() {
             const progress = document.getElementById('uploadProgress');
             progress.style.display = 'block';
             
+            const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
             let fileIndex = 0;
             
             function uploadNextFile() {
@@ -769,33 +736,30 @@ class FileServerService : Service() {
                 
                 const file = files[fileIndex];
                 const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-                const fileId = generateFileId();
-                
-                progress.textContent = '上传: ' + file.name + '\n准备中...';
-                
                 let chunkIndex = 0;
                 
                 function uploadNextChunk() {
                     if (chunkIndex >= totalChunks) {
-                        // 所有块上传完成，发送合并请求
-                        progress.textContent = '合并文件中...';
-                        mergeFile(fileId, file.name, totalChunks, () => {
-                            fileIndex++;
-                            uploadNextFile();
-                        });
+                        fileIndex++;
+                        uploadNextFile();
                         return;
                     }
                     
                     const start = chunkIndex * CHUNK_SIZE;
                     const end = Math.min(start + CHUNK_SIZE, file.size);
                     const chunk = file.slice(start, end);
+                    const isLast = (chunkIndex === totalChunks - 1);
                     
-                    const fileProgress = formatProgress(end, file.size);
-                    progress.textContent = '上传: ' + file.name + '\n块 ' + (chunkIndex + 1) + '/' + totalChunks + '\n' + fileProgress;
+                    progress.textContent = '上传: ' + file.name + '\n' + 
+                        '块 ' + (chunkIndex + 1) + '/' + totalChunks + '\n' + 
+                        formatProgress(end, file.size);
                     
-                    const url = '/upload/chunk?fileId=' + fileId + '&chunkIndex=' + chunkIndex;
+                    const url = '/upload/chunk?filename=' + encodeURIComponent(file.name) + 
+                               '&path=' + encodeURIComponent(currentPath || '') + 
+                               '&chunk=' + chunkIndex + 
+                               '&last=' + isLast;
+                    
                     const xhr = new XMLHttpRequest();
-                    
                     xhr.onload = function() {
                         if (xhr.status === 200) {
                             chunkIndex++;
@@ -804,38 +768,15 @@ class FileServerService : Service() {
                             progress.textContent = '上传失败: HTTP ' + xhr.status;
                         }
                     };
-                    
                     xhr.onerror = function() {
                         progress.textContent = '上传失败: 网络错误';
                     };
-                    
                     xhr.open('POST', url, true);
                     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                     xhr.send(chunk);
                 }
                 
                 uploadNextChunk();
-            }
-            
-            function mergeFile(fileId, fileName, totalChunks, callback) {
-                const url = '/upload/merge?fileId=' + fileId + 
-                           '&fileName=' + encodeURIComponent(fileName) + 
-                           '&totalChunks=' + totalChunks + 
-                           '&path=' + encodeURIComponent(currentPath || '');
-                
-                const xhr = new XMLHttpRequest();
-                xhr.onload = function() {
-                    if (xhr.status === 200) {
-                        callback();
-                    } else {
-                        progress.textContent = '合并失败: HTTP ' + xhr.status;
-                    }
-                };
-                xhr.onerror = function() {
-                    progress.textContent = '合并失败: 网络错误';
-                };
-                xhr.open('POST', url, true);
-                xhr.send();
             }
             
             uploadNextFile();
