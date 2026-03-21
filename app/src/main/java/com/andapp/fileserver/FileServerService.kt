@@ -454,14 +454,7 @@ class FileServerService : Service() {
                     if (isDir) {
                         html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
-                        const ext = name.split('.').pop().toLowerCase();
-                        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'ogg', 'avi', 'mkv', 'mov'];
-                        const isMedia = mediaExts.includes(ext);
-                        if (isMedia) {
-                            html += '<a class="file-name" href="/stream/' + filePath + '" target="_blank">' + name + '</a>';
-                        } else {
-                            html += '<span class="file-name">' + name + '</span>';
-                        }
+                        html += '<a class="file-name" href="/stream/' + filePath + '" target="_blank">' + name + '</a>';
                     }
                     html += '<div class="file-meta">';
                     html += isDir ? 'Folder' : size;
