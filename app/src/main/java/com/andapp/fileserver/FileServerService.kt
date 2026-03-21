@@ -128,8 +128,73 @@ class FileServerService : Service() {
                 session.parseBody(files)
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error parsing upload", e)
-                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload"}""")
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload: ${escapeJson(e.message ?: "")}"}""")
             }
+
+            val uploadPath = session.parameters["path"]?.firstOrNull()
+            android.util.Log.d("FileServer", "Upload path param: $uploadPath")
+            
+            // 使用应用私有目录确保可写
+            val targetPath = if (uploadPath.isNullOrEmpty()) {
+                getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath
+            } else {
+                // 检查目标目录是否可写，不可写则使用应用目录
+                val targetDir = File(uploadPath)
+                if (targetDir.canWrite()) {
+                    uploadPath
+                } else {
+                    android.util.Log.w("FileServer", "Cannot write to $uploadPath, using app private dir")
+                    getExternalFilesDir(null)?.absolutePath ?: filesDir.absolutePath
+                }
+            }
+            
+            android.util.Log.d("FileServer", "Upload target: $targetPath")
+            
+            val targetDir = File(targetPath)
+            if (!targetDir.exists()) {
+                targetDir.mkdirs()
+            }
+            
+            if (!targetDir.canWrite()) {
+                android.util.Log.e("FileServer", "Cannot write to: $targetPath")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No write permission: ${escapeJson(targetPath)}"}""")
+            }
+
+            val uploadedFiles = mutableListOf<String>()
+            
+            android.util.Log.d("FileServer", "Upload files count: ${files.size}")
+            
+            for ((key, tempPath) in files) {
+                android.util.Log.d("FileServer", "Processing upload - key: $key, tempPath: $tempPath")
+                val tempFile = File(tempPath)
+                if (tempFile.exists()) {
+                    android.util.Log.d("FileServer", "Temp file exists, size: ${tempFile.length()}")
+                    // 尝试从参数中获取原始文件名
+                    val originalName = session.parameters[key]?.firstOrNull()
+                    android.util.Log.d("FileServer", "Original name from params: $originalName")
+                    val fileName = if (!originalName.isNullOrEmpty() && originalName != key && !originalName.contains("/")) {
+                        originalName
+                    } else {
+                        // 使用带时间戳的文件名避免冲突
+                        "upload_${System.currentTimeMillis()}_${tempFile.name}"
+                    }
+                    val targetFile = File(targetDir, fileName)
+                    
+                    try {
+                        tempFile.copyTo(targetFile, overwrite = true)
+                        uploadedFiles.add(fileName)
+                        android.util.Log.d("FileServer", "Uploaded: ${targetFile.absolutePath}, size: ${targetFile.length()}")
+                    } catch (e: Exception) {
+                        android.util.Log.e("FileServer", "Error copying file: $fileName", e)
+                    }
+                } else {
+                    android.util.Log.e("FileServer", "Temp file does not exist: $tempPath")
+                }
+            }
+
+            val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        }
 
             val uploadPath = session.parameters["path"]?.firstOrNull()
             android.util.Log.d("FileServer", "Upload path param: $uploadPath")
