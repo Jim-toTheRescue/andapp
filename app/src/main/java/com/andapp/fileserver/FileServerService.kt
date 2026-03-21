@@ -482,7 +482,8 @@ class FileServerService : Service() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Server</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <title>瓦力</title>
     <style>
         * {
             margin: 0;
@@ -648,7 +649,7 @@ class FileServerService : Service() {
 <body>
     <div class="drop-overlay" id="dropOverlay">释放文件以上传</div>
     <div class="container">
-        <h1>🤖 File Server</h1>
+        <h1>🤖 瓦力</h1>
         <div class="breadcrumb" id="breadcrumb"></div>
         <div class="upload-bar">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>

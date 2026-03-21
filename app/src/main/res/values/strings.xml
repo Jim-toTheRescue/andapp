@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">文件服务器</string>
+    <string name="app_name">瓦力</string>
     <string name="start_server">启动服务器</string>
     <string name="stop_server">停止服务器</string>
     <string name="server_status">服务器状态: %s</string>
