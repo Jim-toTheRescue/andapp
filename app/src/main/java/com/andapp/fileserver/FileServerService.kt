@@ -69,7 +69,8 @@ class FileServerService : Service() {
         try {
             if (server == null) {
                 server = FileHttpServer(serverPort)
-                server?.start()
+                // 设置超时时间为 1 小时，支持大文件上传
+                server?.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -183,9 +184,8 @@ class FileServerService : Service() {
                 if (targetFile.exists()) {
                     targetFile.delete()
                 }
-                android.util.Log.e("FileServer", "Upload failed: ${e.javaClass.simpleName}", e)
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", 
-                    """{"error":"上传失败: ${escapeJson(e.message ?: "未知错误")}"}""")
+                    """{"error":"${escapeJson(e.javaClass.simpleName)}: ${escapeJson(e.message ?: "未知错误")}"}""")
             }
         }
         
