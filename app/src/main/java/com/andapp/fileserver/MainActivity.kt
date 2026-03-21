@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.widget.Button
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +19,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.NetworkInterface
@@ -26,7 +28,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
+    private lateinit var loadingProgress: ProgressBar
+    private lateinit var hintText: TextView
     private var isServiceRunning = false
+    private var isTransitioning = false
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
@@ -39,8 +44,12 @@ class MainActivity : AppCompatActivity() {
 
         statusText = findViewById(R.id.statusText)
         toggleButton = findViewById(R.id.toggleButton)
+        loadingProgress = findViewById(R.id.loadingProgress)
+        hintText = findViewById(R.id.hintText)
 
         toggleButton.setOnClickListener {
+            if (isTransitioning) return@setOnClickListener
+            
             if (checkPermissions()) {
                 requestNotificationPermission()
                 if (isServiceRunning) {
@@ -59,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             statusText.text = "需要存储权限才能运行"
             toggleButton.text = "授予权限"
+            toggleButton.setBackgroundResource(R.drawable.btn_round_gray)
         }
     }
 
@@ -142,21 +152,71 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startService() {
+        isTransitioning = true
+        showLoading("正在启动...")
+        
         val intent = Intent(this, FileServerService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
             startService(intent)
         }
-        isServiceRunning = true
-        updateUI()
+        
+        lifecycleScope.launch {
+            delay(500) // 等待服务启动
+            withContext(Dispatchers.IO) {
+                // 再次检查服务是否真的启动了
+                var attempts = 0
+                while (attempts < 5) {
+                    if (isServiceRunning(FileServerService::class.java)) {
+                        break
+                    }
+                    delay(200)
+                    attempts++
+                }
+            }
+            isServiceRunning = isServiceRunning(FileServerService::class.java)
+            isTransitioning = false
+            hideLoading()
+            updateUI()
+            
+            if (isServiceRunning) {
+                Toast.makeText(this@MainActivity, "服务器已启动", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, "启动失败，请重试", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun stopService() {
+        isTransitioning = true
+        showLoading("正在停止...")
+        
         val intent = Intent(this, FileServerService::class.java)
         stopService(intent)
-        isServiceRunning = false
-        updateUI()
+        
+        lifecycleScope.launch {
+            delay(300)
+            isServiceRunning = false
+            isTransitioning = false
+            hideLoading()
+            updateUI()
+            Toast.makeText(this@MainActivity, "服务器已停止", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showLoading(message: String) {
+        toggleButton.isEnabled = false
+        toggleButton.setBackgroundResource(R.drawable.btn_round_gray)
+        toggleButton.text = ""
+        loadingProgress.visibility = android.view.View.VISIBLE
+        statusText.text = message
+        hintText.text = ""
+    }
+
+    private fun hideLoading() {
+        loadingProgress.visibility = android.view.View.GONE
+        toggleButton.isEnabled = true
     }
 
     private fun checkServiceStatus() {
@@ -177,11 +237,15 @@ class MainActivity : AppCompatActivity() {
     private fun updateUI() {
         if (isServiceRunning) {
             val ip = getLocalIpAddress()
-            statusText.text = "服务器运行中\nhttp://$ip:8080"
+            statusText.text = "服务器运行中"
             toggleButton.text = "停止服务器"
+            toggleButton.setBackgroundResource(R.drawable.btn_round_red)
+            hintText.text = "http://$ip:8080"
         } else {
             statusText.text = "服务器已停止"
             toggleButton.text = "启动服务器"
+            toggleButton.setBackgroundResource(R.drawable.btn_round_green)
+            hintText.text = "点击启动后，其他设备可通过浏览器访问"
         }
     }
 

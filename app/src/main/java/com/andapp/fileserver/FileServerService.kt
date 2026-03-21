@@ -123,81 +123,60 @@ class FileServerService : Service() {
         }
 
         private fun serveUpload(session: IHTTPSession): Response {
-            android.util.Log.d("FileServer", "Upload request received, method: ${session.method}, content type: ${session.headers["content-type"]}")
+            android.util.Log.d("FileServer", "Upload request received, method: ${session.method}")
             
-            val files = HashMap<String, String>()
-            try {
-                session.parseBody(files)
-                android.util.Log.d("FileServer", "parseBody completed, files map size: ${files.size}")
-                android.util.Log.d("FileServer", "Parameters: ${session.parameters}")
-            } catch (e: Exception) {
-                android.util.Log.e("FileServer", "Error parsing upload", e)
-                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload: ${escapeJson(e.message ?: "")}"}""")
-            }
-
-            if (files.isEmpty()) {
-                android.util.Log.w("FileServer", "No files received in upload request")
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No files received"}""")
-            }
-
+            // 从 query 参数获取目标路径和文件名
             val uploadPath = session.parameters["path"]?.firstOrNull()
-            android.util.Log.d("FileServer", "Upload path param: $uploadPath")
+            val fileName = session.parameters["filename"]?.firstOrNull()?.let {
+                java.net.URLDecoder.decode(it, "UTF-8")
+            } ?: "upload_${System.currentTimeMillis()}"
             
             // 确定目标目录
             val targetPath = determineUploadTargetPath(uploadPath)
-            android.util.Log.d("FileServer", "Upload target: $targetPath")
-            
             val targetDir = File(targetPath)
             if (!targetDir.exists()) {
                 targetDir.mkdirs()
             }
             
             if (!targetDir.canWrite()) {
-                android.util.Log.e("FileServer", "Cannot write to: $targetPath")
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No write permission: ${escapeJson(targetPath)}"}""")
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", 
+                    """{"error":"无法写入目录: ${escapeJson(targetPath)}"}""")
             }
-
-            val uploadedFiles = mutableListOf<String>()
             
-            android.util.Log.d("FileServer", "Upload files count: ${files.size}")
+            val targetFile = File(targetDir, fileName)
             
-            for ((key, tempPath) in files) {
-                android.util.Log.d("FileServer", "Processing upload - key: $key, tempPath: $tempPath")
-                val tempFile = File(tempPath)
-                if (tempFile.exists()) {
-                    android.util.Log.d("FileServer", "Temp file exists, size: ${tempFile.length()}")
+            try {
+                // 流式写入：直接从输入流写入文件，不加载到内存
+                val inputStream = session.inputStream
+                var totalBytes = 0L
+                
+                targetFile.outputStream().use { outputStream ->
+                    val buffer = ByteArray(8192) // 8KB 缓冲区
+                    var bytesRead: Int
                     
-                    // 获取原始文件名 - 优先从单独的参数获取
-                    val encodedName = session.parameters["filename${key.removePrefix("file")}"]?.firstOrNull()
-                    android.util.Log.d("FileServer", "Encoded filename: $encodedName")
-                    
-                    val fileName = if (!encodedName.isNullOrEmpty()) {
-                        java.net.URLDecoder.decode(encodedName, "UTF-8")
-                    } else {
-                        tempFile.name
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                        totalBytes += bytesRead
                     }
-                    android.util.Log.d("FileServer", "Decoded filename: $fileName")
-                    
-                    val targetFile = File(targetDir, fileName)
-                    
-                    try {
-                        tempFile.copyTo(targetFile, overwrite = true)
-                        uploadedFiles.add(fileName)
-                        android.util.Log.d("FileServer", "Uploaded: ${targetFile.absolutePath}, size: ${targetFile.length()}")
-                        
-                        // 通知系统扫描新文件
-                        notifyMediaScanner(targetFile)
-                        
-                    } catch (e: Exception) {
-                        android.util.Log.e("FileServer", "Error copying file: $fileName", e)
-                    }
-                } else {
-                    android.util.Log.e("FileServer", "Temp file does not exist: $tempPath")
                 }
+                
+                android.util.Log.d("FileServer", "Upload completed: ${targetFile.absolutePath}, size: $totalBytes")
+                
+                // 通知系统扫描新文件
+                notifyMediaScanner(targetFile)
+                
+                val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":["${escapeJson(fileName)}"],"size":$totalBytes}"""
+                return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+                
+            } catch (e: Exception) {
+                // 删除不完整的文件
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+                android.util.Log.e("FileServer", "Upload failed", e)
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", 
+                    """{"error":"上传失败: ${escapeJson(e.message ?: "未知错误")}"}""")
             }
-
-            val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
-            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
         
         private fun determineUploadTargetPath(uploadPath: String?): String {
@@ -670,41 +649,148 @@ class FileServerService : Service() {
             }
         }
         
-        async function uploadFiles(files) {
+        function formatProgress(loaded, total) {
+            if (total === 0) return '0%';
+            const percent = Math.round((loaded / total) * 100);
+            return percent + '% (' + formatSize(loaded) + ' / ' + formatSize(total) + ')';
+        }
+        
+        function uploadFiles(files) {
             if (!files || files.length === 0) return;
             
             const progress = document.getElementById('uploadProgress');
             progress.style.display = 'block';
-            progress.textContent = '上传中...';
+            
+            // 逐个上传文件
+            let currentIndex = 0;
+            
+            function uploadNext() {
+                if (currentIndex >= files.length) {
+                    progress.textContent = '全部上传完成';
+                    loadFiles(currentPath);
+                    setTimeout(() => { progress.style.display = 'none'; }, 3000);
+                    return;
+                }
+                
+                const file = files[currentIndex];
+                progress.textContent = '上传 (' + (currentIndex + 1) + '/' + files.length + '): ' + file.name;
+                
+                // 直接发送原始文件，文件名通过 query 参数传递
+                const url = '/upload?path=' + encodeURIComponent(currentPath || '') + 
+                           '&filename=' + encodeURIComponent(file.name);
+                
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        progress.textContent = '上传 ' + file.name + '\n' + formatProgress(e.loaded, e.total);
+                    }
+                };
+                
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            if (result.success) {
+                                currentIndex++;
+                                uploadNext();
+                            } else {
+                                progress.textContent = '上传失败: ' + (result.error || '未知错误');
+                            }
+                        } catch (e) {
+                            progress.textContent = '解析响应失败';
+                        }
+                    } else {
+                        progress.textContent = '上传失败: HTTP ' + xhr.status;
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    progress.textContent = '上传失败: 网络错误或文件太大';
+                };
+                
+                xhr.ontimeout = function() {
+                    progress.textContent = '上传超时';
+                };
+                
+                // 直接发送文件二进制流，不使用 FormData
+                xhr.open('POST', url, true);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.timeout = 0; // 无超时限制
+                xhr.send(file);
+            }
+            
+            uploadNext();
+        }
+        
+        function uploadFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            // 检查文件大小
+            const MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB 限制
+            let totalSize = 0;
+            for (let i = 0; i < files.length; i++) {
+                totalSize += files[i].size;
+                if (files[i].size > MAX_SIZE) {
+                    alert('文件 "' + files[i].name + '" 太大 (' + formatSize(files[i].size) + ')\n建议限制在 2GB 以内');
+                    return;
+                }
+            }
+            
+            const progress = document.getElementById('uploadProgress');
+            progress.style.display = 'block';
+            progress.textContent = '准备上传 ' + formatSize(totalSize) + '...';
             
             const formData = new FormData();
             formData.append('path', currentPath || '');
             
+            let totalSize = 0;
             for (let i = 0; i < files.length; i++) {
                 formData.append('file' + i, files[i]);
-                // 单独发送文件名，避免编码问题
                 formData.append('filename' + i, encodeURIComponent(files[i].name));
+                totalSize += files[i].size;
             }
             
-            try {
-                const url = '/upload?path=' + encodeURIComponent(currentPath || '');
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    progress.textContent = '上传成功: ' + result.files.join(', ') + '\n保存到: ' + result.targetDir;
-                    loadFiles(currentPath);
-                } else {
-                    progress.textContent = '上传失败: ' + (result.error || '未知错误');
+            const xhr = new XMLHttpRequest();
+            const url = '/upload?path=' + encodeURIComponent(currentPath || '');
+            
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    progress.textContent = '上传中: ' + formatProgress(e.loaded, e.total);
                 }
-            } catch (error) {
-                progress.textContent = '上传失败: ' + error.message;
-            }
+            };
             
-            setTimeout(() => { progress.style.display = 'none'; }, 3000);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        if (result.success) {
+                            progress.textContent = '上传完成: ' + result.files.join(', ') + '\n保存到: ' + result.targetDir;
+                            loadFiles(currentPath);
+                        } else {
+                            progress.textContent = '上传失败: ' + (result.error || '未知错误');
+                        }
+                    } catch (e) {
+                        progress.textContent = '解析响应失败';
+                    }
+                } else {
+                    progress.textContent = '上传失败: HTTP ' + xhr.status;
+                }
+                setTimeout(() => { progress.style.display = 'none'; }, 3000);
+            };
+            
+            xhr.onerror = function() {
+                progress.textContent = '上传失败: 网络错误或文件太大';
+                setTimeout(() => { progress.style.display = 'none'; }, 5000);
+            };
+            
+            xhr.ontimeout = function() {
+                progress.textContent = '上传超时: 文件可能太大';
+                setTimeout(() => { progress.style.display = 'none'; }, 5000);
+            };
+            
+            xhr.open('POST', url, true);
+            xhr.send(formData);
         }
         
         const dropOverlay = document.getElementById('dropOverlay');
