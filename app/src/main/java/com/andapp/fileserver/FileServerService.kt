@@ -101,6 +101,8 @@ class FileServerService : Service() {
             val uri = session.uri
             val decodedUri = java.net.URLDecoder.decode(uri, "UTF-8")
             
+            addLog("${session.method} $decodedUri")
+            
             return when {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
@@ -120,9 +122,11 @@ class FileServerService : Service() {
             val file = File(filePath)
             
             if (!file.exists() || !file.canRead()) {
+                addLog("下载失败: 文件不存在 $filePath")
                 return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "File not found")
             }
 
+            addLog("下载: ${file.name}")
             val fis = FileInputStream(file)
             val mimeType = getMimeType(file.name)
             val encodedName = URLEncoder.encode(file.name, "UTF-8").replace("+", "%20")
@@ -202,10 +206,6 @@ class FileServerService : Service() {
             try {
                 addLog("收到上传请求")
                 
-                // 使用 parseBody 正确处理请求边界
-                val files = HashMap<String, String>()
-                session.parseBody(files)
-                
                 val fileName = session.parameters["filename"]?.firstOrNull()?.let {
                     java.net.URLDecoder.decode(it, "UTF-8")
                 } ?: return errorResponse("Missing filename")
@@ -213,7 +213,14 @@ class FileServerService : Service() {
                 val chunkIndex = session.parameters["chunk"]?.firstOrNull()?.toIntOrNull() ?: 0
                 val isLast = session.parameters["last"]?.firstOrNull() == "true"
                 
-                addLog("文件名: $fileName, 块: $chunkIndex, 路径: $uploadPath")
+                // 从 header 获取内容长度
+                val contentLength = session.headers["content-length"]?.toLongOrNull() ?: -1
+                addLog("文件名: $fileName, 块: $chunkIndex, 大小: $contentLength")
+                
+                if (contentLength <= 0) {
+                    addLog("错误: 无效的内容长度")
+                    return errorResponse("Invalid content length")
+                }
                 
                 val targetPath = determineUploadTargetPath(uploadPath)
                 val targetDir = File(targetPath)
@@ -228,31 +235,21 @@ class FileServerService : Service() {
                 }
                 
                 val targetFile = File(targetDir, fileName)
-                addLog("开始写入文件: ${targetFile.absolutePath}")
+                addLog("写入: ${targetFile.absolutePath}")
                 
-                // parseBody 把数据存到临时文件，从临时文件读取
-                val tempFile = files.values.firstOrNull()?.let { File(it) }
-                if (tempFile == null || !tempFile.exists()) {
-                    addLog("错误: 没有接收到数据")
-                    return errorResponse("No data received")
-                }
-                
-                // 从临时文件追加写入目标文件
+                // 根据 Content-Length 读取指定字节数，不等待 EOF
                 java.io.FileOutputStream(targetFile, chunkIndex > 0).use { output ->
-                    tempFile.inputStream().use { input ->
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        var totalBytes = 0
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            totalBytes += bytesRead
-                        }
-                        addLog("写入完成: $totalBytes 字节")
+                    val buffer = ByteArray(8192)
+                    var remaining = contentLength
+                    while (remaining > 0) {
+                        val toRead = minOf(buffer.size.toLong(), remaining).toInt()
+                        val bytesRead = session.inputStream.read(buffer, 0, toRead)
+                        if (bytesRead == -1) break
+                        output.write(buffer, 0, bytesRead)
+                        remaining -= bytesRead
                     }
+                    addLog("写入完成: ${contentLength - remaining} 字节")
                 }
-                
-                // 清理临时文件
-                tempFile.delete()
                 
                 addLog("上传成功")
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
