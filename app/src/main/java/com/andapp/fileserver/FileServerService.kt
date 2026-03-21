@@ -220,10 +220,6 @@ class FileServerService : Service() {
                     }
                 }
                 
-                if (isLast) {
-                    notifyMediaScanner(targetFile)
-                }
-                
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
                     
             } catch (e: Exception) {
