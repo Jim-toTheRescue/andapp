@@ -124,28 +124,55 @@ class FileServerService : Service() {
         private fun serveFileList(uri: String): Response {
             val path = uri.substringAfter("/api/files?path=").let {
                 if (it == uri) {
-                    Environment.getExternalStorageDirectory().absolutePath
+                    // 尝试外部存储，如果不可用则使用应用私有目录
+                    val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                    val externalDir = File(externalPath)
+                    if (externalDir.exists() && externalDir.canRead()) {
+                        externalPath
+                    } else {
+                        // 使用应用私有目录作为备选
+                        android.util.Log.w("FileServer", "External storage not accessible, using app private directory")
+                        filesDir.absolutePath
+                    }
                 } else {
                     java.net.URLDecoder.decode(it, "UTF-8")
                 }
             }
             
+            android.util.Log.d("FileServer", "Listing files for path: $path")
+            
             val dir = File(path)
-            if (!dir.exists() || !dir.isDirectory) {
-                return newFixedLengthResponse(Response.Status.OK, "application/json", "[]")
+            if (!dir.exists()) {
+                android.util.Log.e("FileServer", "Directory does not exist: $path")
+                return newFixedLengthResponse(Response.Status.OK, "application/json", """{"error":"Directory not found","path":"${escapeJson(path)}"}""")
+            }
+            if (!dir.isDirectory) {
+                android.util.Log.e("FileServer", "Path is not a directory: $path")
+                return newFixedLengthResponse(Response.Status.OK, "application/json", """{"error":"Not a directory","path":"${escapeJson(path)}"}""")
+            }
+            if (!dir.canRead()) {
+                android.util.Log.e("FileServer", "Cannot read directory: $path")
+                return newFixedLengthResponse(Response.Status.OK, "application/json", """{"error":"Permission denied","path":"${escapeJson(path)}"}""")
             }
 
             val files = try {
-                dir.listFiles()?.filter { it.canRead() }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
+                dir.listFiles()?.filter { 
+                    try { it.canRead() } catch (e: Exception) { false }
+                }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
             } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error listing files", e)
                 emptyList()
             }
+            
+            android.util.Log.d("FileServer", "Found ${files.size} files")
             
             val json = buildString {
                 append("[")
                 files.forEachIndexed { index, file ->
                     if (index > 0) append(",")
-                    append("""{"name":"${escapeJson(file.name)}","path":"${escapeJson(file.absolutePath)}","isDirectory":${file.isDirectory},"size":${file.length()},"lastModified":${file.lastModified()}}""")
+                    val size = try { file.length() } catch (e: Exception) { 0L }
+                    val lastModified = try { file.lastModified() } catch (e: Exception) { 0L }
+                    append("""{"name":"${escapeJson(file.name)}","path":"${escapeJson(file.absolutePath)}","isDirectory":${file.isDirectory},"size":${size},"lastModified":${lastModified}}""")
                 }
                 append("]")
             }
@@ -383,7 +410,14 @@ class FileServerService : Service() {
             try {
                 const url = path ? '/api/files?path=' + encodeURIComponent(path) : '/api/files';
                 const response = await fetch(url);
-                const files = await response.json();
+                const data = await response.json();
+                
+                if (data.error) {
+                    fileList.innerHTML = '<div class="empty">Error: ' + data.error + '<br>Path: ' + (data.path || '') + '</div>';
+                    return;
+                }
+                
+                const files = data;
                 
                 if (!files || files.length === 0) {
                     fileList.innerHTML = '<div class="empty">No files found</div>';
@@ -422,7 +456,8 @@ class FileServerService : Service() {
                 
                 fileList.innerHTML = html;
             } catch (error) {
-                fileList.innerHTML = '<div class="empty">Error loading files: ' + error.message + '</div>';
+                console.error('Error loading files:', error);
+                fileList.innerHTML = '<div class="empty">Error loading files: ' + error.message + '<br><br>Please check:<br>1. Server is running<br>2. Storage permissions are granted<br>3. Check Android logcat for details</div>';
             }
         }
         
