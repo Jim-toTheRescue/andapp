@@ -226,7 +226,11 @@ class FileServerService : Service() {
                 if (chunkIndex == 0 && targetFile.exists()) {
                     targetFile.delete()
                 }
-                return errorResponse(e.message ?: "Upload failed")
+                // 返回详细错误信息
+                val errorMsg = "${e.javaClass.simpleName}: ${e.message}"
+                val stackTrace = e.stackTrace.take(5).joinToString("\n") { "  at $it" }
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", 
+                    """{"error":"${escapeJson(errorMsg)}","stack":"${escapeJson(stackTrace)}"}""")
             }
         }
         
@@ -765,7 +769,12 @@ class FileServerService : Service() {
                             chunkIndex++;
                             uploadNextChunk();
                         } else {
-                            progress.textContent = '上传失败: HTTP ' + xhr.status;
+                            try {
+                                const err = JSON.parse(xhr.responseText);
+                                progress.innerHTML = '上传失败<br>' + (err.error || '') + '<br><pre style="font-size:10px;text-align:left">' + (err.stack || '') + '</pre>';
+                            } catch(e) {
+                                progress.textContent = '上传失败: HTTP ' + xhr.status;
+                            }
                         }
                     };
                     xhr.onerror = function() {
