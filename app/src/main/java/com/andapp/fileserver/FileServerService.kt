@@ -132,10 +132,14 @@ class FileServerService : Service() {
             
             val dir = File(path)
             if (!dir.exists() || !dir.isDirectory) {
-                return newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", "[]")
+                return newFixedLengthResponse(Response.Status.OK, "application/json", "[]")
             }
 
-            val files = dir.listFiles()?.filter { it.canRead() }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
+            val files = try {
+                dir.listFiles()?.filter { it.canRead() }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
             
             val json = buildString {
                 append("[")
@@ -377,10 +381,11 @@ class FileServerService : Service() {
             fileList.innerHTML = '<div class="loading">Loading...</div>';
             
             try {
-                const response = await fetch('/api/files?path=' + encodeURIComponent(path));
+                const url = path ? '/api/files?path=' + encodeURIComponent(path) : '/api/files';
+                const response = await fetch(url);
                 const files = await response.json();
                 
-                if (files.length === 0) {
+                if (!files || files.length === 0) {
                     fileList.innerHTML = '<div class="empty">No files found</div>';
                     return;
                 }
