@@ -196,67 +196,6 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
-            val uploadPath = session.parameters["path"]?.firstOrNull()
-            android.util.Log.d("FileServer", "Upload path param: $uploadPath")
-            
-            val targetPath = if (uploadPath.isNullOrEmpty()) {
-                Environment.getExternalStorageDirectory().absolutePath
-            } else {
-                uploadPath
-            }
-            
-            android.util.Log.d("FileServer", "Upload target: $targetPath")
-            
-            val targetDir = File(targetPath)
-            
-            if (!targetDir.exists()) {
-                android.util.Log.e("FileServer", "Directory does not exist: $targetPath")
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Directory not found: $targetPath"}""")
-            }
-            if (!targetDir.isDirectory) {
-                android.util.Log.e("FileServer", "Not a directory: $targetPath")
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Not a directory: $targetPath"}""")
-            }
-            if (!targetDir.canWrite()) {
-                android.util.Log.e("FileServer", "Cannot write to: $targetPath")
-                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"No write permission: $targetPath"}""")
-            }
-
-            val uploadedFiles = mutableListOf<String>()
-            
-            android.util.Log.d("FileServer", "Upload files count: ${files.size}")
-            
-            for ((key, tempPath) in files) {
-                android.util.Log.d("FileServer", "Processing upload - key: $key, tempPath: $tempPath")
-                val tempFile = File(tempPath)
-                if (tempFile.exists()) {
-                    android.util.Log.d("FileServer", "Temp file exists, size: ${tempFile.length()}")
-                    // 尝试从参数中获取原始文件名，如果没有则使用临时文件名
-                    val originalName = session.parameters[key]?.firstOrNull()
-                    android.util.Log.d("FileServer", "Original name from params: $originalName")
-                    val fileName = if (!originalName.isNullOrEmpty() && originalName != key) {
-                        originalName
-                    } else {
-                        tempFile.name
-                    }
-                    val targetFile = File(targetDir, fileName)
-                    
-                    try {
-                        tempFile.copyTo(targetFile, overwrite = true)
-                        uploadedFiles.add(fileName)
-                        android.util.Log.d("FileServer", "Uploaded: ${targetFile.absolutePath}, size: ${targetFile.length()}")
-                    } catch (e: Exception) {
-                        android.util.Log.e("FileServer", "Error copying file: $fileName", e)
-                    }
-                } else {
-                    android.util.Log.e("FileServer", "Temp file does not exist: $tempPath")
-                }
-            }
-
-            val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
-            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
-        }
-
         private fun serveFileList(session: IHTTPSession): Response {
             val path = session.parameters["path"]?.firstOrNull()?.let {
                 java.net.URLDecoder.decode(it, "UTF-8")
