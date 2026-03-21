@@ -95,9 +95,9 @@ class FileServerService : Service() {
             return when {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
-                decodedUri == "/upload" && session.method == Method.POST -> serveUpload(session)
-                decodedUri == "/upload/chunk" && session.method == Method.POST -> serveUploadChunk(session)
-                decodedUri == "/upload/merge" && session.method == Method.POST -> serveUploadMerge(session)
+                decodedUri == "/upload/chunk" -> serveUploadChunk(session)
+                decodedUri == "/upload/merge" -> serveUploadMerge(session)
+                decodedUri == "/upload" -> serveUpload(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
             }
