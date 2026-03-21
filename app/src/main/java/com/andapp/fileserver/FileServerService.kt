@@ -190,21 +190,26 @@ class FileServerService : Service() {
         }
         
         private fun serveUploadChunk(session: IHTTPSession): Response {
-            val fileName = session.parameters["filename"]?.firstOrNull()?.let {
-                java.net.URLDecoder.decode(it, "UTF-8")
-            } ?: return errorResponse("Missing filename")
-            val uploadPath = session.parameters["path"]?.firstOrNull()
-            val chunkIndex = session.parameters["chunk"]?.firstOrNull()?.toIntOrNull() ?: 0
-            val isLast = session.parameters["last"]?.firstOrNull() == "true"
-            
-            val targetPath = determineUploadTargetPath(uploadPath)
-            val targetDir = File(targetPath)
-            if (!targetDir.exists()) targetDir.mkdirs()
-            
-            val targetFile = File(targetDir, fileName)
-            
             try {
-                // 第一个块覆盖写，后续块追加写
+                val fileName = session.parameters["filename"]?.firstOrNull()?.let {
+                    java.net.URLDecoder.decode(it, "UTF-8")
+                } ?: return errorResponse("Missing filename")
+                val uploadPath = session.parameters["path"]?.firstOrNull()
+                val chunkIndex = session.parameters["chunk"]?.firstOrNull()?.toIntOrNull() ?: 0
+                val isLast = session.parameters["last"]?.firstOrNull() == "true"
+                
+                val targetPath = determineUploadTargetPath(uploadPath)
+                val targetDir = File(targetPath)
+                
+                if (!targetDir.exists()) {
+                    return errorResponse("Directory not exists: $targetPath")
+                }
+                if (!targetDir.canWrite()) {
+                    return errorResponse("Cannot write to: $targetPath")
+                }
+                
+                val targetFile = File(targetDir, fileName)
+                
                 java.io.FileOutputStream(targetFile, chunkIndex > 0).use { output ->
                     session.inputStream.use { input ->
                         val buffer = ByteArray(8192)
@@ -215,7 +220,6 @@ class FileServerService : Service() {
                     }
                 }
                 
-                // 最后一个块上传完成，通知系统
                 if (isLast) {
                     notifyMediaScanner(targetFile)
                 }
@@ -223,14 +227,7 @@ class FileServerService : Service() {
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
                     
             } catch (e: Exception) {
-                if (chunkIndex == 0 && targetFile.exists()) {
-                    targetFile.delete()
-                }
-                // 返回详细错误信息
-                val errorMsg = "${e.javaClass.simpleName}: ${e.message}"
-                val stackTrace = e.stackTrace.take(5).joinToString("\n") { "  at $it" }
-                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", 
-                    """{"error":"${escapeJson(errorMsg)}","stack":"${escapeJson(stackTrace)}"}""")
+                return errorResponse("${e.javaClass.simpleName}: ${e.message}")
             }
         }
         
