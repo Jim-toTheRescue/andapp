@@ -108,7 +108,7 @@ class FileServerService : Service() {
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
                 decodedUri == "/upload/chunk" -> serveUploadChunk(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
-                else -> serveFile(decodedUri)
+                else -> serveFile(session, decodedUri)
             }
         }
 
@@ -394,7 +394,7 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
-        private fun serveFile(uri: String): Response {
+        private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
             if (!file.exists() || !file.canRead()) {
@@ -405,9 +405,38 @@ class FileServerService : Service() {
                 return serveIndex()
             }
 
-            val fis = FileInputStream(file)
             val mimeType = getMimeType(file.name)
-            return newChunkedResponse(Response.Status.OK, mimeType, fis)
+            val fileLength = file.length()
+            val rangeHeader = session.headers["range"]
+            
+            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                // 处理 Range 请求
+                val range = rangeHeader.substring(6)
+                val parts = range.split("-")
+                val start = parts[0].toLongOrNull() ?: 0L
+                val end = if (parts.size > 1 && parts[1].isNotEmpty()) {
+                    parts[1].toLongOrNull() ?: (fileLength - 1)
+                } else {
+                    fileLength - 1
+                }
+                
+                val contentLength = end - start + 1
+                val fis = FileInputStream(file)
+                fis.skip(start)
+                
+                val response = newChunkedResponse(Response.Status.PARTIAL_CONTENT, mimeType, fis)
+                response.addHeader("Content-Range", "bytes $start-$end/$fileLength")
+                response.addHeader("Content-Length", contentLength.toString())
+                response.addHeader("Accept-Ranges", "bytes")
+                return response
+            } else {
+                // 普通请求
+                val fis = FileInputStream(file)
+                val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
+                response.addHeader("Accept-Ranges", "bytes")
+                response.addHeader("Content-Length", fileLength.toString())
+                return response
+            }
         }
 
         private fun getMimeType(fileName: String): String {
@@ -741,7 +770,7 @@ class FileServerService : Service() {
             return percent + '% (' + formatSize(loaded) + ' / ' + formatSize(total) + ')';
         }
         
-        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB per chunk
+        const CHUNK_SIZE = 100 * 1024 * 1024; // 100MB per chunk
         
         function generateFileId() {
             return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -753,7 +782,7 @@ class FileServerService : Service() {
             const progress = document.getElementById('uploadProgress');
             progress.style.display = 'block';
             
-            const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB
+            const CHUNK_SIZE = 100 * 1024 * 1024; // 100MB
             let fileIndex = 0;
             
             function uploadNextFile() {
@@ -780,9 +809,7 @@ class FileServerService : Service() {
                     const chunk = file.slice(start, end);
                     const isLast = (chunkIndex === totalChunks - 1);
                     
-                    progress.textContent = '上传: ' + file.name + '\n' + 
-                        '块 ' + (chunkIndex + 1) + '/' + totalChunks + '\n' + 
-                        formatProgress(end, file.size);
+                    progress.textContent = file.name + '\n' + formatProgress(end, file.size);
                     
                     const url = '/upload/chunk?filename=' + encodeURIComponent(file.name) + 
                                '&path=' + encodeURIComponent(currentPath || '') + 
