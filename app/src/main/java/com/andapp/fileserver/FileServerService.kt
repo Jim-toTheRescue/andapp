@@ -437,7 +437,8 @@ class FileServerService : Service() {
                     html += '<div class="file-icon">' + icon + '</div>';
                     html += '<div class="file-info">';
                     if (isDir) {
-                        html += "<a class=\"file-name\" href=\"#\" onclick=\"loadFiles('" + filePath + "')\">" + name + "</a>";
+                        val escapedPath = filePath.replace("\\", "\\\\").replace("'", "\\'")
+                        html += "<a class=\"file-name\" href=\"#\" onclick=\"loadFiles('" + escapedPath + "')\">" + name + "</a>";
                     } else {
                         html += '<span class="file-name">' + name + '</span>';
                     }
