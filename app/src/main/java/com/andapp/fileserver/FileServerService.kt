@@ -167,15 +167,16 @@ class FileServerService : Service() {
                 if (tempFile.exists()) {
                     android.util.Log.d("FileServer", "Temp file exists, size: ${tempFile.length()}")
                     
-                    // 获取原始文件名
-                    val originalName = session.parameters[key]?.firstOrNull()
-                    android.util.Log.d("FileServer", "Original name from params: $originalName")
+                    // 获取原始文件名 - 优先从单独的参数获取
+                    val encodedName = session.parameters["filename${key.removePrefix("file")}"]?.firstOrNull()
+                    android.util.Log.d("FileServer", "Encoded filename: $encodedName")
                     
-                    val fileName = if (!originalName.isNullOrEmpty() && originalName != key && !originalName.contains("/")) {
-                        java.net.URLDecoder.decode(originalName, "UTF-8")
+                    val fileName = if (!encodedName.isNullOrEmpty()) {
+                        java.net.URLDecoder.decode(encodedName, "UTF-8")
                     } else {
                         tempFile.name
                     }
+                    android.util.Log.d("FileServer", "Decoded filename: $fileName")
                     
                     val targetFile = File(targetDir, fileName)
                     
@@ -680,7 +681,9 @@ class FileServerService : Service() {
             formData.append('path', currentPath || '');
             
             for (let i = 0; i < files.length; i++) {
-                formData.append('file' + i, files[i], files[i].name);
+                formData.append('file' + i, files[i]);
+                // 单独发送文件名，避免编码问题
+                formData.append('filename' + i, encodeURIComponent(files[i].name));
             }
             
             try {
