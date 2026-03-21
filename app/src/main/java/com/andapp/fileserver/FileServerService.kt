@@ -201,6 +201,11 @@ class FileServerService : Service() {
         private fun serveUploadChunk(session: IHTTPSession): Response {
             try {
                 addLog("收到上传请求")
+                
+                // 使用 parseBody 正确处理请求边界
+                val files = HashMap<String, String>()
+                session.parseBody(files)
+                
                 val fileName = session.parameters["filename"]?.firstOrNull()?.let {
                     java.net.URLDecoder.decode(it, "UTF-8")
                 } ?: return errorResponse("Missing filename")
@@ -212,8 +217,6 @@ class FileServerService : Service() {
                 
                 val targetPath = determineUploadTargetPath(uploadPath)
                 val targetDir = File(targetPath)
-                
-                addLog("目标目录: $targetPath, 存在: ${targetDir.exists()}, 可写: ${targetDir.canWrite()}")
                 
                 if (!targetDir.exists()) {
                     addLog("错误: 目录不存在")
@@ -227,18 +230,29 @@ class FileServerService : Service() {
                 val targetFile = File(targetDir, fileName)
                 addLog("开始写入文件: ${targetFile.absolutePath}")
                 
+                // parseBody 把数据存到临时文件，从临时文件读取
+                val tempFile = files.values.firstOrNull()?.let { File(it) }
+                if (tempFile == null || !tempFile.exists()) {
+                    addLog("错误: 没有接收到数据")
+                    return errorResponse("No data received")
+                }
+                
+                // 从临时文件追加写入目标文件
                 java.io.FileOutputStream(targetFile, chunkIndex > 0).use { output ->
-                    var totalBytes = 0
-                    session.inputStream.use { input ->
+                    tempFile.inputStream().use { input ->
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
+                        var totalBytes = 0
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
                             totalBytes += bytesRead
                         }
+                        addLog("写入完成: $totalBytes 字节")
                     }
-                    addLog("写入完成: $totalBytes 字节")
                 }
+                
+                // 清理临时文件
+                tempFile.delete()
                 
                 addLog("上传成功")
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"success":true}""")
