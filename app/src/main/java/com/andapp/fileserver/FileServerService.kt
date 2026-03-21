@@ -94,7 +94,7 @@ class FileServerService : Service() {
             return when {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
-                decodedUri.startsWith("/api/files") -> serveFileList(decodedUri)
+                decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
             }
         }
@@ -121,21 +121,19 @@ class FileServerService : Service() {
             return response
         }
 
-        private fun serveFileList(uri: String): Response {
-            val path = uri.substringAfter("/api/files?path=").let {
-                if (it == uri) {
-                    // 尝试外部存储，如果不可用则使用应用私有目录
-                    val externalPath = Environment.getExternalStorageDirectory().absolutePath
-                    val externalDir = File(externalPath)
-                    if (externalDir.exists() && externalDir.canRead()) {
-                        externalPath
-                    } else {
-                        // 使用应用私有目录作为备选
-                        android.util.Log.w("FileServer", "External storage not accessible, using app private directory")
-                        filesDir.absolutePath
-                    }
+        private fun serveFileList(session: IHTTPSession): Response {
+            val path = session.parameters["path"]?.firstOrNull()?.let {
+                java.net.URLDecoder.decode(it, "UTF-8")
+            } ?: run {
+                // 尝试外部存储，如果不可用则使用应用私有目录
+                val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                val externalDir = File(externalPath)
+                if (externalDir.exists() && externalDir.canRead()) {
+                    externalPath
                 } else {
-                    java.net.URLDecoder.decode(it, "UTF-8")
+                    // 使用应用私有目录作为备选
+                    android.util.Log.w("FileServer", "External storage not accessible, using app private directory")
+                    filesDir.absolutePath
                 }
             }
             
