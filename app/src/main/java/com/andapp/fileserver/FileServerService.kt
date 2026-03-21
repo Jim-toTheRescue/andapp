@@ -437,7 +437,7 @@ class FileServerService : Service() {
                     html += '<div class="file-icon">' + icon + '</div>';
                     html += '<div class="file-info">';
                     if (isDir) {
-                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
+                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute('data-path'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
                         html += '<span class="file-name">' + name + '</span>';
                     }
