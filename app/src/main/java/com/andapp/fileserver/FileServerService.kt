@@ -381,25 +381,32 @@ class FileServerService : Service() {
                 
                 let html = '';
                 files.forEach(file => {
-                    html += `
-                        <div class="file-item">
-                            <div class="file-icon">${getIcon(file)}</div>
-                            <div class="file-info">
-                                ${file.isDirectory 
-                                    ? `<a class="file-name" href="#" onclick="loadFiles('${file.path}')">${file.name}</a>`
-                                    : `<span class="file-name">${file.name}</span>`
-                                }
-                                <div class="file-meta">
-                                    ${file.isDirectory ? 'Folder' : formatSize(file.size)} • ${formatDate(file.lastModified)}
-                                </div>
-                            </div>
-                            ${!file.isDirectory ? `
-                                <div class="file-actions">
-                                    <a class="btn btn-download" href="/download/${file.path}" download>Download</a>
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
+                    const icon = getIcon(file);
+                    const name = file.name;
+                    const filePath = file.path;
+                    const isDir = file.isDirectory;
+                    const size = formatSize(file.size);
+                    const date = formatDate(file.lastModified);
+                    
+                    html += '<div class="file-item">';
+                    html += '<div class="file-icon">' + icon + '</div>';
+                    html += '<div class="file-info">';
+                    if (isDir) {
+                        html += '<a class="file-name" href="#" onclick="loadFiles(\\'' + filePath + '\\')">' + name + '</a>';
+                    } else {
+                        html += '<span class="file-name">' + name + '</span>';
+                    }
+                    html += '<div class="file-meta">';
+                    html += isDir ? 'Folder' : size;
+                    html += ' • ' + date;
+                    html += '</div>';
+                    html += '</div>';
+                    if (!isDir) {
+                        html += '<div class="file-actions">';
+                        html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
                 });
                 
                 fileList.innerHTML = html;
