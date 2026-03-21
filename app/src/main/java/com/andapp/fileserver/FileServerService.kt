@@ -25,8 +25,8 @@ class FileServerService : Service() {
         val errorLog = mutableListOf<String>()
         fun addLog(msg: String) {
             val time = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
-            errorLog.add(0, "[$time] $msg")
-            if (errorLog.size > 50) errorLog.removeLast()
+            errorLog.add("[$time] $msg")
+            if (errorLog.size > 50) errorLog.removeFirst()
         }
     }
 
@@ -372,7 +372,7 @@ class FileServerService : Service() {
             val files = try {
                 dir.listFiles()?.filter { 
                     try { it.canRead() } catch (e: Exception) { false }
-                }?.sortedWith(compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }) ?: emptyList()
+                }?.sortedWith(compareBy<File> { !it.isDirectory }.thenByDescending { it.lastModified() }) ?: emptyList()
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error listing files", e)
                 emptyList()
@@ -817,6 +817,12 @@ class FileServerService : Service() {
                                '&last=' + isLast;
                     
                     const xhr = new XMLHttpRequest();
+                    xhr.upload.onprogress = function(e) {
+                        if (e.lengthComputable) {
+                            const uploaded = start + e.loaded;
+                            progress.textContent = file.name + '\n' + formatProgress(uploaded, file.size);
+                        }
+                    };
                     xhr.onload = function() {
                         if (xhr.status === 200) {
                             chunkIndex++;
