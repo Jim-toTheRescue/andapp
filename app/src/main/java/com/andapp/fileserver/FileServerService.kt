@@ -95,6 +95,7 @@ class FileServerService : Service() {
                 decodedUri == "/" -> serveIndex()
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
                 decodedUri.startsWith("/stream/") -> serveStream(decodedUri)
+                decodedUri == "/upload" && session.method == Method.POST -> serveUpload(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
                 else -> serveFile(decodedUri)
             }
@@ -136,6 +137,44 @@ class FileServerService : Service() {
             val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
             response.addHeader("Accept-Ranges", "bytes")
             return response
+        }
+
+        private fun serveUpload(session: IHTTPSession): Response {
+            val files = HashMap<String, String>()
+            try {
+                session.parseBody(files)
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error parsing upload", e)
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json", """{"error":"Failed to parse upload"}""")
+            }
+
+            val uploadPath = session.parameters["path"]?.firstOrNull() ?: Environment.getExternalStorageDirectory().absolutePath
+            val targetDir = File(uploadPath)
+            
+            if (!targetDir.exists() || !targetDir.isDirectory) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json", """{"error":"Target directory not found"}""")
+            }
+
+            val uploadedFiles = mutableListOf<String>()
+            
+            for ((key, tempPath) in files) {
+                val tempFile = File(tempPath)
+                if (tempFile.exists()) {
+                    val fileName = session.parameters[key]?.firstOrNull() ?: key
+                    val targetFile = File(targetDir, fileName)
+                    
+                    try {
+                        tempFile.copyTo(targetFile, overwrite = true)
+                        uploadedFiles.add(fileName)
+                        android.util.Log.d("FileServer", "Uploaded: ${targetFile.absolutePath}")
+                    } catch (e: Exception) {
+                        android.util.Log.e("FileServer", "Error copying file: $fileName", e)
+                    }
+                }
+            }
+
+            val json = """{"success":true,"files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
         private fun serveFileList(session: IHTTPSession): Response {
@@ -358,12 +397,67 @@ class FileServerService : Service() {
             text-align: center;
             color: #999;
         }
+        .upload-bar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .upload-btn {
+            background: #4caf50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .upload-btn:hover {
+            background: #388e3c;
+        }
+        .upload-hint {
+            color: #999;
+            font-size: 13px;
+        }
+        .drop-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(25, 118, 210, 0.1);
+            border: 3px dashed #1976d2;
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #1976d2;
+        }
+        .drop-overlay.active {
+            display: flex;
+        }
+        .upload-progress {
+            display: none;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
+    <div class="drop-overlay" id="dropOverlay">释放文件以上传</div>
     <div class="container">
         <h1>📁 File Server</h1>
         <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="upload-bar">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
+            <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
+            <span class="upload-hint">或拖拽文件到页面上传</span>
+            <div class="upload-progress" id="uploadProgress"></div>
+        </div>
         <div class="file-list" id="fileList">
             <div class="loading">Loading...</div>
         </div>
@@ -475,6 +569,59 @@ class FileServerService : Service() {
                 fileList.innerHTML = '<div class="empty">Error loading files: ' + error.message + '<br><br>Please check:<br>1. Server is running<br>2. Storage permissions are granted<br>3. Check Android logcat for details</div>';
             }
         }
+        
+        async function uploadFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            const progress = document.getElementById('uploadProgress');
+            progress.style.display = 'block';
+            progress.textContent = '上传中...';
+            
+            const formData = new FormData();
+            formData.append('path', currentPath || '');
+            
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file' + i, files[i]);
+            }
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    progress.textContent = '上传成功: ' + result.files.join(', ');
+                    loadFiles(currentPath);
+                } else {
+                    progress.textContent = '上传失败: ' + (result.error || '未知错误');
+                }
+            } catch (error) {
+                progress.textContent = '上传失败: ' + error.message;
+            }
+            
+            setTimeout(() => { progress.style.display = 'none'; }, 3000);
+        }
+        
+        const dropOverlay = document.getElementById('dropOverlay');
+        
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('active');
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+            if (e.relatedTarget === null) {
+                dropOverlay.classList.remove('active');
+            }
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.remove('active');
+            uploadFiles(e.dataTransfer.files);
+        });
         
         loadFiles();
     </script>
