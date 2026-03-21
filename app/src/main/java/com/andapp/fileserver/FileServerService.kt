@@ -188,7 +188,7 @@ class FileServerService : Service() {
                 }
             }
 
-            val json = """{"success":true,"files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
+            val json = """{"success":true,"targetDir":"${escapeJson(targetPath)}","files":${uploadedFiles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }}}"""
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
@@ -609,7 +609,7 @@ class FileServerService : Service() {
                 const result = await response.json();
                 
                 if (result.success) {
-                    progress.textContent = '上传成功: ' + result.files.join(', ');
+                    progress.textContent = '上传成功: ' + result.files.join(', ') + '\n保存到: ' + result.targetDir;
                     loadFiles(currentPath);
                 } else {
                     progress.textContent = '上传失败: ' + (result.error || '未知错误');
