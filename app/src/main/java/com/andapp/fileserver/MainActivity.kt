@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
+import java.net.NetworkInterface
 import java.net.URL
 
 class MainActivity : AppCompatActivity() {
@@ -179,11 +180,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateUI() {
         if (isServiceRunning) {
-            statusText.text = "服务器运行中，端口: 8080"
+            val ip = getLocalIpAddress()
+            statusText.text = "服务器运行中\nhttp://$ip:8080"
             toggleButton.text = "停止服务器"
         } else {
             statusText.text = "服务器已停止"
             toggleButton.text = "启动服务器"
         }
+    }
+
+    private fun getLocalIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val intf = interfaces.nextElement()
+                val addrs = intf.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                        return addr.hostAddress ?: "unknown"
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return "unknown"
     }
 }

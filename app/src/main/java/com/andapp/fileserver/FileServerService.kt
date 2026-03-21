@@ -348,13 +348,6 @@ class FileServerService : Service() {
         .btn-download:hover {
             background: #1565c0;
         }
-        .btn-view {
-            background: #4caf50;
-            color: white;
-        }
-        .btn-view:hover {
-            background: #388e3c;
-        }
         .empty {
             padding: 40px;
             text-align: center;
@@ -461,7 +454,14 @@ class FileServerService : Service() {
                     if (isDir) {
                         html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
-                        html += '<span class="file-name">' + name + '</span>';
+                        const ext = name.split('.').pop().toLowerCase();
+                        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'ogg', 'avi', 'mkv', 'mov'];
+                        const isMedia = mediaExts.includes(ext);
+                        if (isMedia) {
+                            html += '<a class="file-name" href="/stream/' + filePath + '" target="_blank">' + name + '</a>';
+                        } else {
+                            html += '<span class="file-name">' + name + '</span>';
+                        }
                     }
                     html += '<div class="file-meta">';
                     html += isDir ? 'Folder' : size;
@@ -469,14 +469,7 @@ class FileServerService : Service() {
                     html += '</div>';
                     html += '</div>';
                     if (!isDir) {
-                        const ext = name.split('.').pop().toLowerCase();
-                        const mediaExts = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'webm', 'mp3', 'wav', 'ogg', 'avi', 'mkv', 'mov'];
-                        const isMedia = mediaExts.includes(ext);
-                        
                         html += '<div class="file-actions">';
-                        if (isMedia) {
-                            html += '<a class="btn btn-view" href="/stream/' + filePath + '" target="_blank">View</a>';
-                        }
                         html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
                         html += '</div>';
                     }
