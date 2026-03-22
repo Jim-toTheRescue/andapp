@@ -497,11 +497,6 @@ class FileServerService : Service() {
             }
         }
 
-        private fun errorResponse(message: String): Response {
-            return newFixedLengthResponse(Response.Status.OK, "application/json", 
-                """{"success":false,"error":"${escapeJson(message)}"}""")
-        }
-
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
