@@ -518,12 +518,14 @@
                 // 目录列表
                 if (data.directories && data.directories.length > 0) {
                     data.directories.forEach(dir => {
+                        const dateStr = dir.lastModified ? formatDate(dir.lastModified) : '';
                         html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;\" " +
                             "onclick=\"loadDirectories('" + dir.path.replace(/'/g, "\\'") + "')\" " +
                             "onmouseover=\"this.style.background='#f5f5f5'\" " +
                             "onmouseout=\"this.style.background='white'\">" +
                             "<span style=\"font-size:18px;\">📁</span>" +
-                            "<span>" + dir.name + "</span>" +
+                            "<span style=\"flex:1;\">" + dir.name + "</span>" +
+                            (dateStr ? "<span style=\"font-size:12px;color:#999;white-space:nowrap;\">" + dateStr + "</span>" : "") +
                         "</div>";
                     });
                 } else {

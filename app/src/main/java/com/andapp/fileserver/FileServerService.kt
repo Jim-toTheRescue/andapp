@@ -549,9 +549,10 @@ class FileServerService : Service() {
             val directories = try {
                 dir.listFiles()
                     ?.filter { it.isDirectory && it.canRead() && !it.name.startsWith(".") }
-                    ?.sortedBy { it.name.lowercase() }
+                    ?.sortedByDescending { it.lastModified() }
                     ?.map { dir ->
-                        """{"name":"${escapeJson(dir.name)}","path":"${escapeJson(dir.absolutePath)}"}"""
+                        val lastModified = try { dir.lastModified() } catch (e: Exception) { 0L }
+                        """{"name":"${escapeJson(dir.name)}","path":"${escapeJson(dir.absolutePath)}","lastModified":${lastModified}}"""
                     } ?: emptyList()
             } catch (e: Exception) {
                 emptyList()
