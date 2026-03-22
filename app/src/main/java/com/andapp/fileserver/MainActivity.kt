@@ -299,18 +299,24 @@ class MainActivity : AppCompatActivity() {
     private fun checkForUpdate() {
         lifecycleScope.launch {
             try {
+                val currentVersion = getCurrentVersion()
+                FileServerService.addLog("更新检查: 当前版本=$currentVersion")
+                
                 val updateInfo = withContext(Dispatchers.IO) {
                     fetchLatestRelease()
                 }
                 
                 updateInfo?.let { (latestVersion, downloadUrl, releaseName) ->
-                    val currentVersion = getCurrentVersion()
+                    FileServerService.addLog("更新检查: 最新版本=$latestVersion")
                     if (compareVersions(currentVersion, latestVersion) < 0) {
+                        FileServerService.addLog("发现新版本 $latestVersion，弹出更新提示")
                         showUpdateDialog(latestVersion, downloadUrl, releaseName)
+                    } else {
+                        FileServerService.addLog("当前已是最新版本")
                     }
-                }
+                } ?: FileServerService.addLog("更新检查: 获取版本失败")
             } catch (e: Exception) {
-                // 忽略更新检查错误
+                FileServerService.addLog("更新检查失败: ${e.message}")
             }
         }
     }
