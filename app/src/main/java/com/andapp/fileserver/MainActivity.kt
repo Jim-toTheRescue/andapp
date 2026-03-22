@@ -2,6 +2,7 @@ package com.andapp.fileserver
 
 import android.Manifest
 import android.app.ActivityManager
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -17,12 +19,18 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.NetworkInterface
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
@@ -37,6 +45,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val PERMISSION_REQUEST_CODE = 100
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 101
+        private const val INSTALL_PERMISSION_REQUEST_CODE = 102
+        private const val UPDATE_CHECK_DELAY = 2000L
+        private const val GITHUB_API_URL = "https://api.github.com/repos/Jim-toTheRescue/andapp/releases/tags/latest"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,6 +91,11 @@ class MainActivity : AppCompatActivity() {
             statusText.text = "需要存储权限才能运行"
             toggleButton.text = "授予权限"
             toggleButton.setBackgroundResource(R.drawable.btn_round_gray)
+        }
+
+        lifecycleScope.launch {
+            delay(UPDATE_CHECK_DELAY)
+            checkForUpdate()
         }
     }
 
@@ -278,5 +294,201 @@ class MainActivity : AppCompatActivity() {
             e.printStackTrace()
         }
         return "unknown"
+    }
+
+    private fun checkForUpdate() {
+        lifecycleScope.launch {
+            try {
+                val updateInfo = withContext(Dispatchers.IO) {
+                    fetchLatestRelease()
+                }
+                
+                updateInfo?.let { (latestVersion, downloadUrl, releaseName) ->
+                    val currentVersion = getCurrentVersion()
+                    if (compareVersions(currentVersion, latestVersion) < 0) {
+                        showUpdateDialog(latestVersion, downloadUrl, releaseName)
+                    }
+                }
+            } catch (e: Exception) {
+                // 忽略更新检查错误
+            }
+        }
+    }
+
+    private fun getCurrentVersion(): String {
+        return try {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            packageInfo.versionName ?: "0"
+        } catch (e: Exception) {
+            "0"
+        }
+    }
+
+    private fun fetchLatestRelease(): Triple<String, String, String>? {
+        return try {
+            val url = URL(GITHUB_API_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/json")
+            connection.connectTimeout = 10000
+            
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().readText()
+                val json = JSONObject(response)
+                
+                val tagName = json.getString("tag_name")
+                val name = json.optString("name", "Latest Build")
+                
+                val assets = json.getJSONArray("assets")
+                var downloadUrl = ""
+                
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    if (asset.getString("name").endsWith(".apk")) {
+                        downloadUrl = asset.getString("browser_download_url")
+                        break
+                    }
+                }
+                
+                if (downloadUrl.isNotEmpty()) {
+                    Triple(tagName, downloadUrl, name)
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun compareVersions(current: String, latest: String): Int {
+        val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
+        val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
+        
+        val maxLen = maxOf(currentParts.size, latestParts.size)
+        
+        for (i in 0 until maxLen) {
+            val c = currentParts.getOrElse(i) { 0 }
+            val l = latestParts.getOrElse(i) { 0 }
+            if (c != l) return c.compareTo(l)
+        }
+        return 0
+    }
+
+    private fun showUpdateDialog(version: String, downloadUrl: String, releaseName: String) {
+        runOnUiThread {
+            AlertDialog.Builder(this)
+                .setTitle("发现新版本")
+                .setMessage("最新版本: $version\n$releaseName\n\n是否立即更新？")
+                .setPositiveButton("更新") { _, _ ->
+                    downloadAndInstall(downloadUrl)
+                }
+                .setNegativeButton("稍后") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .setCancelable(true)
+                .show()
+        }
+    }
+
+    private fun downloadAndInstall(downloadUrl: String) {
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "正在下载更新...", Toast.LENGTH_SHORT).show()
+                }
+                
+                val apkFile = withContext(Dispatchers.IO) {
+                    downloadApk(downloadUrl)
+                }
+                
+                apkFile?.let {
+                    withContext(Dispatchers.Main) {
+                        installApk(it)
+                    }
+                } ?: withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "下载失败", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "更新失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun downloadApk(url: String): File? {
+        return try {
+            val downloadUrl = URL(url)
+            val connection = downloadUrl.openConnection() as HttpURLConnection
+            connection.connect()
+            
+            val inputStream = connection.inputStream
+            val apkFile = File(getExternalFilesDir(null), "update.apk")
+            val outputStream = FileOutputStream(apkFile)
+            
+            val buffer = ByteArray(4096)
+            var bytesRead: Int
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                outputStream.write(buffer, 0, bytesRead)
+            }
+            
+            outputStream.close()
+            inputStream.close()
+            connection.disconnect()
+            
+            apkFile
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun installApk(apkFile: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!packageManager.canRequestPackageInstalls()) {
+                requestInstallPermission()
+                return
+            }
+        }
+        performInstall(apkFile)
+    }
+
+    private fun requestInstallPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AlertDialog.Builder(this)
+                .setTitle("需要安装权限")
+                .setMessage("请在设置中允许安装未知来源应用")
+                .setPositiveButton("去设置") { _, _ ->
+                    startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:$packageName")
+                    })
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+    }
+
+    private fun performInstall(apkFile: File) {
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                apkFile
+            )
+            
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            
+            startActivity(intent)
+        } catch (e: Exception) {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.fromFile(apkFile), "application/vnd.android.package-archive")
+            }
+            startActivity(intent)
+        }
     }
 }
