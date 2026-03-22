@@ -114,7 +114,10 @@
 <body>
     <div class="container">
         <h1>📊 系统状态</h1>
-        <button class="refresh-btn" onclick="loadSystemInfo()">🔄 刷新</button>
+        <div style="margin-bottom:20px;">
+            <a href="/" class="refresh-btn" style="display:inline-block;text-decoration:none;">📁 返回文件管理</a>
+            <button class="refresh-btn" onclick="loadSystemInfo()">🔄 刷新</button>
+        </div>
         
         <div class="system-card">
             <h3>📱 设备信息</h3>

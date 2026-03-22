@@ -97,6 +97,8 @@ class FileServerService : Service() {
 
     inner class FileHttpServer(port: Int) : NanoHTTPD(port) {
 
+        private val systemMonitor = SystemMonitor(this@FileServerService)
+
         override fun serve(session: IHTTPSession): Response {
             val uri = session.uri
             val decodedUri = java.net.URLDecoder.decode(uri, "UTF-8")
@@ -113,6 +115,8 @@ class FileServerService : Service() {
                 decodedUri == "/api/directories" -> serveDirectories(session)
                 decodedUri == "/api/mkdir" && session.method == Method.POST -> serveMkdir(session)
                 decodedUri == "/api/rename" && session.method == Method.POST -> serveRename(session)
+                decodedUri == "/api/system" -> serveSystem()
+                decodedUri == "/system" -> serveSystemPage()
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -681,6 +685,21 @@ class FileServerService : Service() {
             }
         }
 
+        private fun serveSystem(): Response {
+            return try {
+                val json = systemMonitor.getSystemInfo()
+                newFixedLengthResponse(Response.Status.OK, "application/json", json)
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error getting system info", e)
+                errorResponse("Error: ${e.message}")
+            }
+        }
+
+        private fun serveSystemPage(): Response {
+            val html = generateSystemHtml()
+            return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        }
+
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
@@ -767,6 +786,15 @@ class FileServerService : Service() {
                 assets.open("web/index.html").bufferedReader().use { it.readText() }
             } catch (e: Exception) {
                 addLog("Failed to load index.html: ${e.message}")
+                "<html><body><h1>Error loading page</h1><p>${e.message}</p></body></html>"
+            }
+        }
+
+        private fun generateSystemHtml(): String {
+            return try {
+                assets.open("web/system.html").bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                addLog("Failed to load system.html: ${e.message}")
                 "<html><body><h1>Error loading page</h1><p>${e.message}</p></body></html>"
             }
         }

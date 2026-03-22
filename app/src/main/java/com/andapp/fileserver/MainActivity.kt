@@ -182,20 +182,11 @@ class MainActivity : AppCompatActivity() {
         isTransitioning = true
         showLoading("正在启动...")
         
-        // 启动文件服务
-        val fileIntent = Intent(this, FileServerService::class.java)
+        val intent = Intent(this, FileServerService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(fileIntent)
+            startForegroundService(intent)
         } else {
-            startService(fileIntent)
-        }
-        
-        // 启动系统监控服务
-        val monitorIntent = Intent(this, SystemMonitorService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(monitorIntent)
-        } else {
-            startService(monitorIntent)
+            startService(intent)
         }
         
         lifecycleScope.launch {
@@ -222,13 +213,8 @@ class MainActivity : AppCompatActivity() {
         isTransitioning = true
         showLoading("正在停止...")
         
-        // 停止文件服务
-        val fileIntent = Intent(this, FileServerService::class.java)
-        stopService(fileIntent)
-        
-        // 停止系统监控服务
-        val monitorIntent = Intent(this, SystemMonitorService::class.java)
-        stopService(monitorIntent)
+        val intent = Intent(this, FileServerService::class.java)
+        stopService(intent)
         
         lifecycleScope.launch {
             delay(300)
