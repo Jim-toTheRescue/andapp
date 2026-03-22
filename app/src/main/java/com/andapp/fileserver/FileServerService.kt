@@ -974,8 +974,8 @@ class FileServerService : Service() {
                     html += '</div>';
                     html += '<div class="file-actions">';
                     html += '<a class="btn btn-download" href="/download/' + filePath + '" download>下载</a>';
-                    html += "<button class=\"btn btn-move\" onclick=\"showMoveDialog('" + filePath.replace(/'/g, "\\'") + "')\">移动</button>";
-                    html += "<button class=\"btn btn-delete\" onclick=\"deleteFile('" + filePath.replace(/'/g, "\\'") + "')\">删除</button>";
+                    html += '<button class="btn btn-move" onclick="showMoveDialog(&apos;' + filePath.replace(/'/g, "&apos;") + '&apos;)">移动</button>';
+                    html += '<button class="btn btn-delete" onclick="deleteFile(&apos;' + filePath.replace(/'/g, "&apos;") + '&apos;)">删除</button>';
                     html += '</div>';
                     html += '</div>';
                 });
@@ -1174,22 +1174,22 @@ class FileServerService : Service() {
                 
                 // 返回上级目录
                 if (data.parentPath) {
-                    html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;\" onclick=\"loadDirectories('" + data.parentPath.replace(/'/g, "\\'") + "')\">" +
-                        "<span style=\"font-size:18px;\">📁</span>" +
-                        "<span style=\"color:#1976d2;\">.. 返回上级</span>" +
-                    "</div>";
+                    html += '<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;" onclick="loadDirectories(&apos;' + data.parentPath.replace(/'/g, "&apos;") + '&apos;)">' +
+                        '<span style="font-size:18px;">📁</span>' +
+                        '<span style="color:#1976d2;">.. 返回上级</span>' +
+                    '</div>';
                 }
                 
                 // 目录列表
                 if (data.directories && data.directories.length > 0) {
                     data.directories.forEach(dir => {
-                        html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;\" " +
-                            "onclick=\"loadDirectories('" + dir.path.replace(/'/g, "\\'") + "')\" " +
-                            "onmouseover=\"this.style.background='#f5f5f5'\" " +
-                            "onmouseout=\"this.style.background='white'\">" +
-                            "<span style=\"font-size:18px;\">📁</span>" +
-                            "<span>" + dir.name + "</span>" +
-                        "</div>";
+                        html += '<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;" ' +
+                            'onclick="loadDirectories(&apos;' + dir.path.replace(/'/g, "&apos;") + '&apos;)" ' +
+                            'onmouseover="this.style.background=&apos;#f5f5f5&apos;" ' +
+                            'onmouseout="this.style.background=&apos;white&apos;">' +
+                            '<span style="font-size:18px;">📁</span>' +
+                            '<span>' + dir.name + '</span>' +
+                        '</div>';
                     });
                 } else {
                     html += '<div style="padding:20px;text-align:center;color:#999;">此目录没有子文件夹</div>';
