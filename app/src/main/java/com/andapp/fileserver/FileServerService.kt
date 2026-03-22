@@ -568,7 +568,8 @@ class FileServerService : Service() {
                 val success = newDir.mkdirs()
                 
                 return if (success) {
-                    val json = """{"success":true,"message":"Directory created","path":"${escapeJson(newDir.absolutePath)}"}"""
+                    val escapedPath = escapeJson(newDir.absolutePath)
+                    val json = "{\"success\":true,\"message\":\"Directory created\",\"path\":\"" + escapedPath + "\"}"
                     newFixedLengthResponse(Response.Status.OK, "application/json", json)
                 } else {
                     errorResponse("Failed to create directory")
@@ -962,7 +963,7 @@ class FileServerService : Service() {
                     html += '<div class="file-icon">' + icon + '</div>';
                     html += '<div class="file-info">';
                     if (isDir) {
-                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
+                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(&quot;data-path&quot;))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
                         html += '<a class="file-name" href="' + filePath + '" target="_blank">' + name + '</a>';
                     }
