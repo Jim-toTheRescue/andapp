@@ -591,7 +591,8 @@ class FileServerService : Service() {
                 packageInfo.versionCode.toLong()
             }
             
-            val json = """{"versionName":"$versionName","versionCode":$versionCode}"""
+            val escapedName = versionName.replace("\"", "\\\"")
+            val json = "{\"versionName\":\"" + escapedName + "\",\"versionCode\":" + versionCode + "}"
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
