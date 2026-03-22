@@ -431,9 +431,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun downloadApk(url: String): File? {
         return try {
+            FileServerService.addLog("开始下载: $url")
             val downloadUrl = URL(url)
             val connection = downloadUrl.openConnection() as HttpURLConnection
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 15000
             connection.connect()
+            
+            val responseCode = connection.responseCode
+            if (responseCode != 200) {
+                FileServerService.addLog("下载失败: HTTP $responseCode")
+                return null
+            }
+            
+            val contentLength = connection.contentLength
+            FileServerService.addLog("文件大小: $contentLength 字节")
             
             val inputStream = connection.inputStream
             val apkFile = File(getExternalFilesDir(null), "update.apk")
@@ -441,16 +453,20 @@ class MainActivity : AppCompatActivity() {
             
             val buffer = ByteArray(4096)
             var bytesRead: Int
+            var totalBytes = 0
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                 outputStream.write(buffer, 0, bytesRead)
+                totalBytes += bytesRead
             }
             
             outputStream.close()
             inputStream.close()
             connection.disconnect()
             
+            FileServerService.addLog("下载完成: $totalBytes 字节")
             apkFile
         } catch (e: Exception) {
+            FileServerService.addLog("下载异常: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
