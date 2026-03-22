@@ -3,6 +3,15 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def getVersionCode() {
+    return (System.currentTimeMillis() / 1000).toInteger()
+}
+
+def getVersionName() {
+    def time = new Date().format("yyyyMMdd.HHmm")
+    return time
+}
+
 android {
     namespace 'com.andapp.fileserver'
     compileSdk 34
@@ -11,8 +20,8 @@ android {
         applicationId "com.andapp.fileserver"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode getVersionCode()
+        versionName getVersionName()
     }
 
     buildTypes {
