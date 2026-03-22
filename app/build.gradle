@@ -3,14 +3,6 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-def getVersionCode() {
-    return (System.currentTimeMillis() / 1000).toInteger()
-}
-
-def getVersionName() {
-    return new Date().format("yyyyMMdd.HHmm")
-}
-
 android {
     namespace 'com.andapp.fileserver'
     compileSdk 34
@@ -19,8 +11,8 @@ android {
         applicationId "com.andapp.fileserver"
         minSdk 24
         targetSdk 34
-        versionCode getVersionCode()
-        versionName getVersionName()
+        versionCode project.hasProperty('vCode') ? project.vCode.toInteger() : 1
+        versionName project.hasProperty('vName') ? project.vName : "1.0"
     }
 
     buildTypes {

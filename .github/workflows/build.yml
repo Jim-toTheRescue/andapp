@@ -25,77 +25,32 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
         
-      - name: Generate debug keystore
+      # 【核心优化】全流程只生成一次版本信息
+      - name: Generate Version Env
+        id: version_env
         run: |
-          if [ ! -f app/debug.keystore ]; then
-            keytool -genkey -v -keystore app/debug.keystore \
-              -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -storepass android -keypass android
-          fi
-        
+          echo "v_code=${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "v_name=1.0.${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      # 【修正】显式传递变量，确保不出现 null
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
-        
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 30
-
-      - name: Get version info
-        id: version
         run: |
-          # 获取当前时间戳作为版本号
-          VERSION_NAME=$(date +%Y%m%d.%H%M)
-          VERSION_CODE=$(date +%s)
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "version_name=$VERSION_NAME"
-          echo "version_code=$VERSION_CODE"
-
-      - name: Delete old release
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              const release = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tag: 'latest'
-              });
-              
-              // Delete old APK assets
-              for (const asset of release.data.assets) {
-                await github.rest.repos.deleteReleaseAsset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  asset_id: asset.id
-                });
-              }
-              
-              console.log('Deleted old assets');
-            } catch (error) {
-              console.log('No existing release found or error:', error.message);
-            }
-
-      - name: Update or Create Release
+          ./gradlew assembleDebug \
+            -PvCode=${{ steps.version_env.outputs.v_code }} \
+            -PvName=${{ steps.version_env.outputs.v_name }}
+        
+      - name: Update latest Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "瓦力 ${{ steps.version.outputs.version_name }}"
+          name: "瓦力 v${{ steps.version_env.outputs.v_name }}"
           body: |
-            ## 瓦力 Android App
-            
-            **版本**: ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
-            **构建时间**: ${{ github.event.head_commit.timestamp }}
-            **提交信息**: ${{ github.event.head_commit.message }}
-            
-            ---
-            
-            下载 `app-debug.apk` 安装到您的 Android 设备。
+            ## 瓦力 Android 自动化交付
+            - **内部版本号**: ${{ steps.version_env.outputs.v_code }}
+            - **显示版本号**: ${{ steps.version_env.outputs.v_name }}
+            - **提交信息**: ${{ github.event.head_commit.message }}
           files: app/build/outputs/apk/debug/*.apk
           prerelease: true
-          make_latest: false
+          # 【黑科技】开启此项后，会自动覆盖旧的 latest Release 和文件，无需手动脚本删除
+          allowUpdates: true
+          make_latest: true
