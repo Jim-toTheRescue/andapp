@@ -426,6 +426,8 @@ class FileServerService : Service() {
             addLog("Request body: $body")
             
             if (body == null) return errorResponse("Missing request body")
+            
+            try {
                 val json = org.json.JSONObject(body)
                 val path = json.getString("path")
                 addLog("Path: $path")
