@@ -398,16 +398,34 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
+        private fun readRequestBody(session: IHTTPSession): String? {
+            return try {
+                val contentLength = session.headers["content-length"]?.toIntOrNull() ?: 0
+                if (contentLength > 0) {
+                    val buffer = ByteArray(contentLength)
+                    val inputStream = session.inputStream
+                    var totalRead = 0
+                    while (totalRead < contentLength) {
+                        val read = inputStream.read(buffer, totalRead, contentLength - totalRead)
+                        if (read == -1) break
+                        totalRead += read
+                    }
+                    String(buffer, 0, totalRead, Charsets.UTF_8)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                addLog("Error reading request body: ${e.message}")
+                null
+            }
+        }
+
         private fun serveDelete(session: IHTTPSession): Response {
             addLog("=== serveDelete ===")
-            val requestBody = HashMap<String, String>()
-            session.parseBody(requestBody)
-            val body = requestBody["postData"]
+            val body = readRequestBody(session)
             addLog("Request body: $body")
             
             if (body == null) return errorResponse("Missing request body")
-            
-            try {
                 val json = org.json.JSONObject(body)
                 val path = json.getString("path")
                 addLog("Path: $path")
@@ -447,9 +465,7 @@ class FileServerService : Service() {
 
         private fun serveMove(session: IHTTPSession): Response {
             addLog("=== serveMove ===")
-            val requestBody = HashMap<String, String>()
-            session.parseBody(requestBody)
-            val body = requestBody["postData"]
+            val body = readRequestBody(session)
             addLog("Request body: $body")
             
             if (body == null) return errorResponse("Missing request body")
@@ -514,12 +530,17 @@ class FileServerService : Service() {
         }
 
         private fun serveDirectories(session: IHTTPSession): Response {
+            addLog("=== serveDirectories ===")
             val path = session.parameters["path"]?.firstOrNull()?.let {
                 java.net.URLDecoder.decode(it, "UTF-8")
             }?.takeIf { it != "/" } ?: Environment.getExternalStorageDirectory().absolutePath
             
+            addLog("Path: $path")
             val dir = File(path)
+            addLog("Dir exists: ${dir.exists()}, isDirectory: ${dir.isDirectory}, canRead: ${dir.canRead()}")
+            
             if (!dir.exists() || !dir.isDirectory) {
+                addLog("Invalid directory: $path")
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"error":"Invalid directory"}""")
             }
             
@@ -538,11 +559,11 @@ class FileServerService : Service() {
             val parentPath = dir.parent
             
             val json = buildString {
-                append("""{"currentPath":"${escapeJson(dir.absolutePath)}",""")
+                append("""{"currentPath":"${escapeJson(dir.absolutePath)}"""")
                 if (parentPath != null) {
-                    append(""","parentPath":"${escapeJson(parentPath)}",""")
+                    append(""","parentPath":"${escapeJson(parentPath)}"""")
                 }
-                append(",\"directories\":[${directories.joinToString(",")}]}")
+                append(""","directories":[${directories.joinToString(",")}]}""")
             }
             
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
@@ -550,9 +571,7 @@ class FileServerService : Service() {
 
         private fun serveMkdir(session: IHTTPSession): Response {
             addLog("=== serveMkdir ===")
-            val requestBody = HashMap<String, String>()
-            session.parseBody(requestBody)
-            val body = requestBody["postData"]
+            val body = readRequestBody(session)
             addLog("Request body: $body")
             
             if (body == null) return errorResponse("Missing request body")
