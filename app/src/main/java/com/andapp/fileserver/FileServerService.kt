@@ -111,6 +111,7 @@ class FileServerService : Service() {
                 decodedUri == "/api/delete" && session.method == Method.POST -> serveDelete(session)
                 decodedUri == "/api/move" && session.method == Method.POST -> serveMove(session)
                 decodedUri == "/api/directories" -> serveDirectories(session)
+                decodedUri == "/api/mkdir" && session.method == Method.POST -> serveMkdir(session)
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -533,6 +534,51 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
+        private fun serveMkdir(session: IHTTPSession): Response {
+            val requestBody = HashMap<String, String>()
+            session.parseBody(requestBody)
+            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            
+            try {
+                val json = org.json.JSONObject(body)
+                val parentPath = json.getString("parentPath")
+                val dirName = json.getString("dirName")
+                
+                if (dirName.isEmpty() || dirName.contains("/") || dirName.contains("\\")) {
+                    return errorResponse("Invalid directory name")
+                }
+                
+                val parentDir = File(parentPath)
+                if (!parentDir.exists() || !parentDir.isDirectory) {
+                    return errorResponse("Parent directory not found")
+                }
+                
+                // 检查权限
+                val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                if (!parentDir.absolutePath.startsWith(externalPath) && 
+                    !parentDir.absolutePath.startsWith(filesDir.absolutePath)) {
+                    return errorResponse("Permission denied")
+                }
+                
+                val newDir = File(parentDir, dirName)
+                if (newDir.exists()) {
+                    return errorResponse("Directory already exists")
+                }
+                
+                val success = newDir.mkdirs()
+                
+                return if (success) {
+                    newFixedLengthResponse(Response.Status.OK, "application/json", 
+                        """{"success":true,"message":"Directory created","path":"${escapeJson(newDir.absolutePath)}"}""")
+                } else {
+                    errorResponse("Failed to create directory")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error creating directory", e)
+                return errorResponse("Error: ${e.message}")
+            }
+        }
+
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
@@ -771,6 +817,18 @@ class FileServerService : Service() {
         .upload-btn:hover {
             background: #388e3c;
         }
+        .mkdir-btn {
+            background: #2196f3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .mkdir-btn:hover {
+            background: #1976d2;
+        }
         .upload-hint {
             color: #999;
             font-size: 13px;
@@ -807,6 +865,7 @@ class FileServerService : Service() {
         <div class="upload-bar">
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
             <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
+            <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
             <span class="upload-hint">或拖拽文件到页面上传</span>
             <div class="upload-progress" id="uploadProgress"></div>
         </div>
@@ -1114,22 +1173,22 @@ class FileServerService : Service() {
                 
                 // 返回上级目录
                 if (data.parentPath) {
-                    html += `<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;" onclick="loadDirectories('${data.parentPath.replace(/'/g, "\\'")}')">
-                        <span style="font-size:18px;">📁</span>
-                        <span style="color:#1976d2;">.. 返回上级</span>
-                    </div>`;
+                    html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;\" onclick=\"loadDirectories('" + data.parentPath.replace(/'/g, "\\'") + "')\">" +
+                        "<span style=\"font-size:18px;\">📁</span>" +
+                        "<span style=\"color:#1976d2;\">.. 返回上级</span>" +
+                    "</div>";
                 }
                 
                 // 目录列表
                 if (data.directories && data.directories.length > 0) {
                     data.directories.forEach(dir => {
-                        html += `<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;" 
-                            onclick="loadDirectories('${dir.path.replace(/'/g, "\\'")}')" 
-                            onmouseover="this.style.background='#f5f5f5'" 
-                            onmouseout="this.style.background='white'">
-                            <span style="font-size:18px;">📁</span>
-                            <span>${dir.name}</span>
-                        </div>`;
+                        html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;\" " +
+                            "onclick=\"loadDirectories('" + dir.path.replace(/'/g, "\\'") + "')\" " +
+                            "onmouseover=\"this.style.background='#f5f5f5'\" " +
+                            "onmouseout=\"this.style.background='white'\">" +
+                            "<span style=\"font-size:18px;\">📁</span>" +
+                            "<span>" + dir.name + "</span>" +
+                        "</div>";
                     });
                 } else {
                     html += '<div style="padding:20px;text-align:center;color:#999;">此目录没有子文件夹</div>';
@@ -1172,14 +1231,29 @@ class FileServerService : Service() {
                 alert('移动失败: ' + error.message);
             }
         }
+        
+        function showMkdirDialog() {
+            const dirName = prompt('请输入新文件夹名称:');
+            if (!dirName || dirName.trim() === '') return;
+            createDirectory(dirName.trim());
+        }
+        
+        async function createDirectory(dirName) {
+            try {
+                const response = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ parentPath: currentPath || '/', dirName: dirName })
+                });
+                const result = await response.json();
+                
                 if (result.success) {
                     loadFiles(currentPath);
-                    alert('移动成功');
                 } else {
-                    alert('移动失败: ' + (result.error || '未知错误'));
+                    alert('创建失败: ' + (result.error || '未知错误'));
                 }
             } catch (error) {
-                alert('移动失败: ' + error.message);
+                alert('创建失败: ' + error.message);
             }
         }
     </script>
