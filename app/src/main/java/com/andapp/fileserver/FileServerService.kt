@@ -112,6 +112,7 @@ class FileServerService : Service() {
                 decodedUri == "/api/move" && session.method == Method.POST -> serveMove(session)
                 decodedUri == "/api/directories" -> serveDirectories(session)
                 decodedUri == "/api/mkdir" && session.method == Method.POST -> serveMkdir(session)
+                decodedUri == "/api/rename" && session.method == Method.POST -> serveRename(session)
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -624,6 +625,58 @@ class FileServerService : Service() {
                 }
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error creating directory", e)
+                return errorResponse("Error: ${e.message}")
+            }
+        }
+
+        private fun serveRename(session: IHTTPSession): Response {
+            addLog("=== serveRename ===")
+            val body = readRequestBody(session)
+            addLog("Request body: $body")
+            
+            if (body == null) return errorResponse("Missing request body")
+            
+            try {
+                val json = org.json.JSONObject(body)
+                val path = json.getString("path")
+                val newName = json.getString("newName")
+                addLog("Path: $path, NewName: $newName")
+                
+                if (newName.isEmpty() || newName.contains("/") || newName.contains("\\")) {
+                    return errorResponse("Invalid name")
+                }
+                
+                val file = File(path)
+                addLog("File exists: ${file.exists()}")
+                
+                if (!file.exists()) {
+                    return errorResponse("File not found")
+                }
+                
+                // 检查权限
+                val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                if (!file.absolutePath.startsWith(externalPath) && 
+                    !file.absolutePath.startsWith(filesDir.absolutePath)) {
+                    return errorResponse("Permission denied")
+                }
+                
+                val parentDir = file.parentFile ?: return errorResponse("Cannot get parent directory")
+                val newFile = File(parentDir, newName)
+                
+                if (newFile.exists()) {
+                    return errorResponse("A file with this name already exists")
+                }
+                
+                val success = file.renameTo(newFile)
+                
+                return if (success) {
+                    newFixedLengthResponse(Response.Status.OK, "application/json", 
+                        """{"success":true,"message":"Renamed successfully","newPath":"${escapeJson(newFile.absolutePath)}"}""")
+                } else {
+                    errorResponse("Failed to rename")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error renaming file", e)
                 return errorResponse("Error: ${e.message}")
             }
         }

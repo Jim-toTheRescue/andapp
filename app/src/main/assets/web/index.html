@@ -121,6 +121,13 @@
         .btn-delete:hover {
             background: #d32f2f;
         }
+        .btn-rename {
+            background: #9c27b0;
+            color: white;
+        }
+        .btn-rename:hover {
+            background: #7b1fa2;
+        }
         .empty {
             padding: 40px;
             text-align: center;
@@ -309,6 +316,7 @@
                     html += '</div>';
                     html += '<div class="file-actions">';
                     html += '<a class="btn btn-download" href="/download/' + filePath + '" download>下载</a>';
+                    html += '<button class="btn btn-rename" onclick="showRenameDialog(\'' + filePath.replace(/'/g, "\\'") + '\', \'' + name.replace(/'/g, "\\'") + '\')">重命名</button>';
                     html += '<button class="btn btn-move" onclick="showMoveDialog(\'' + filePath.replace(/'/g, "\\'") + '\')">移动</button>';
                     html += '<button class="btn btn-delete" onclick="deleteFile(\'' + filePath.replace(/'/g, "\\'") + '\')">删除</button>';
                     html += '</div>';
@@ -591,6 +599,31 @@
                 }
             } catch (error) {
                 alert('创建失败: ' + error.message);
+            }
+        }
+        
+        function showRenameDialog(path, currentName) {
+            const newName = prompt('请输入新名称:', currentName);
+            if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+            renameFile(path, newName.trim());
+        }
+        
+        async function renameFile(path, newName) {
+            try {
+                const response = await fetch('/api/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path, newName: newName })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadFiles(currentPath);
+                } else {
+                    alert('重命名失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('重命名失败: ' + error.message);
             }
         }
     </script>
