@@ -347,10 +347,10 @@ class MainActivity : AppCompatActivity() {
                 val response = connection.inputStream.bufferedReader().readText()
                 val json = JSONObject(response)
                 
-                // 从 Release name 提取版本号，格式如 "瓦力 20260322.0701"
+                // 从 Release name 提取版本号，格式如 "瓦力 v1.0.82"
                 val name = json.optString("name", "")
-                val versionMatch = """(\d{8}\.\d{4})""".toRegex().find(name)
-                val tagName = versionMatch?.value ?: "0"
+                val versionMatch = """v?(\d+\.\d+\.\d+)""".toRegex().find(name)
+                val tagName = versionMatch?.groupValues?.getOrNull(1) ?: "0"
                 
                 val assets = json.getJSONArray("assets")
                 var downloadUrl = ""
