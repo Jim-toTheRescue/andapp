@@ -112,6 +112,7 @@ class FileServerService : Service() {
                 decodedUri == "/api/move" && session.method == Method.POST -> serveMove(session)
                 decodedUri == "/api/directories" -> serveDirectories(session)
                 decodedUri == "/api/mkdir" && session.method == Method.POST -> serveMkdir(session)
+                decodedUri == "/api/version" -> serveVersion()
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -580,6 +581,20 @@ class FileServerService : Service() {
             }
         }
 
+        private fun serveVersion(): Response {
+            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+            val versionName = packageInfo.versionName
+            val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            
+            val json = """{"versionName":"$versionName","versionCode":$versionCode}"""
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        }
+
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
@@ -830,6 +845,18 @@ class FileServerService : Service() {
         .mkdir-btn:hover {
             background: #1976d2;
         }
+        .update-btn {
+            background: #ff9800;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .update-btn:hover {
+            background: #f57c00;
+        }
         .upload-hint {
             color: #999;
             font-size: 13px;
@@ -867,6 +894,7 @@ class FileServerService : Service() {
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
             <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
             <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
+            <button class="update-btn" onclick="checkUpdate()">检查更新</button>
             <span class="upload-hint">或拖拽文件到页面上传</span>
             <div class="upload-progress" id="uploadProgress"></div>
         </div>
@@ -1254,6 +1282,39 @@ class FileServerService : Service() {
             } catch (error) {
                 alert('创建失败: ' + error.message);
             }
+        }
+        
+        async function checkUpdate() {
+            const btn = document.querySelector('.update-btn');
+            btn.textContent = '检查中...';
+            btn.disabled = true;
+            
+            try {
+                const versionRes = await fetch('/api/version');
+                const localVersion = await versionRes.json();
+                
+                const releaseRes = await fetch('https://api.github.com/repos/Jim-toTheRescue/andapp/releases/tags/latest');
+                const release = await releaseRes.json();
+                
+                if (release.assets && release.assets.length > 0) {
+                    const apk = release.assets[0];
+                    const updateInfo = '当前版本: ' + localVersion.versionName + '\n' +
+                        '最新构建: ' + release.name + '\n' +
+                        '发布时间: ' + new Date(release.published_at).toLocaleString() + '\n\n' +
+                        '是否下载更新?';
+                    
+                    if (confirm(updateInfo)) {
+                        window.open(apk.browser_download_url, '_blank');
+                    }
+                } else {
+                    alert('未找到发布版本');
+                }
+            } catch (error) {
+                alert('检查更新失败: ' + error.message);
+            }
+            
+            btn.textContent = '检查更新';
+            btn.disabled = false;
         }
     </script>
 </body>

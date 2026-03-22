@@ -1,4 +1,4 @@
-name: Build APK
+name: Build and Release APK
 
 on:
   push:
@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       
@@ -32,3 +34,57 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION_NAME=$(grep 'versionName' app/build.gradle | awk -F'"' '{print $2}')
+          VERSION_CODE=$(grep 'versionCode' app/build.gradle | awk '{print $2}')
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME"
+          echo "version_code=$VERSION_CODE"
+
+      - name: Delete old release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: 'latest'
+              });
+              
+              // Delete old APK assets
+              for (const asset of release.data.assets) {
+                await github.rest.repos.deleteReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  asset_id: asset.id
+                });
+              }
+              
+              console.log('Deleted old assets');
+            } catch (error) {
+              console.log('No existing release found or error:', error.message);
+            }
+
+      - name: Update or Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "瓦力 Latest Build"
+          body: |
+            ## 瓦力 Android App
+            
+            **版本**: ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})
+            **构建时间**: ${{ github.event.head_commit.timestamp }}
+            **提交信息**: ${{ github.event.head_commit.message }}
+            
+            ---
+            
+            下载 `app-debug.apk` 安装到您的 Android 设备。
+          files: app/build/outputs/apk/debug/*.apk
+          prerelease: true
+          make_latest: false
