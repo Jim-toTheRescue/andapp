@@ -324,15 +324,9 @@ class MainActivity : AppCompatActivity() {
     private fun getCurrentVersion(): String {
         return try {
             val packageInfo = packageManager.getPackageInfo(packageName, 0)
-            val versionName = packageInfo.versionName ?: "null"
-            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                packageInfo.longVersionCode
-            } else {
-                @Suppress("DEPRECATION")
-                packageInfo.versionCode.toLong()
-            }
-            FileServerService.addLog("当前版本: name=$versionName, code=$versionCode")
-            if (versionName == "null") "0" else versionName
+            FileServerService.addLog("packageName=$packageName")
+            FileServerService.addLog("versionName=${packageInfo.versionName}")
+            packageInfo.versionName ?: "0"
         } catch (e: Exception) {
             FileServerService.addLog("获取版本失败: ${e.message}")
             "0"

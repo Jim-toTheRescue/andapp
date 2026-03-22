@@ -8,8 +8,7 @@ def getVersionCode() {
 }
 
 def getVersionName() {
-    def time = new Date().format("yyyyMMdd.HHmm")
-    return time
+    return new Date().format("yyyyMMdd.HHmm")
 }
 
 android {
