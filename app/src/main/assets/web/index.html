@@ -292,8 +292,8 @@
     <div class="container">
         <h1>🤖 瓦力</h1>
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="switchPage('files')">📁 文件管理</button>
-            <button class="nav-tab" onclick="switchPage('system')">📊 系统状态</button>
+            <button class="nav-tab active">📁 文件管理</button>
+            <a href=":8081/" class="nav-tab" style="text-decoration:none;color:inherit;">📊 系统状态</a>
         </div>
         
         <!-- 文件管理页面 -->
@@ -308,34 +308,6 @@
             </div>
             <div class="file-list" id="fileList">
                 <div class="loading">Loading...</div>
-            </div>
-        </div>
-        
-        <!-- 系统状态页面 -->
-        <div class="page" id="page-system">
-            <div class="system-card">
-                <h3>📱 设备信息</h3>
-                <div class="system-info" id="deviceInfo">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-            <div class="system-card">
-                <h3>🔋 电池状态</h3>
-                <div class="system-info" id="batteryInfo">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-            <div class="system-card">
-                <h3>💾 存储空间</h3>
-                <div class="system-info" id="storageInfo">
-                    <div class="loading">加载中...</div>
-                </div>
-            </div>
-            <div class="system-card">
-                <h3>🧠 内存使用</h3>
-                <div class="system-info" id="memoryInfo">
-                    <div class="loading">加载中...</div>
-                </div>
             </div>
         </div>
     </div>
@@ -747,92 +719,6 @@
                 }
             } catch (error) {
                 alert('重命名失败: ' + error.message);
-            }
-        }
-        
-        function switchPage(page) {
-            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById('page-' + page).classList.add('active');
-            
-            if (page === 'system') {
-                loadSystemInfo();
-            }
-        }
-        
-        function formatUptime(ms) {
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-            
-            if (days > 0) return days + '天 ' + (hours % 24) + '小时';
-            if (hours > 0) return hours + '小时 ' + (minutes % 60) + '分钟';
-            if (minutes > 0) return minutes + '分钟';
-            return seconds + '秒';
-        }
-        
-        function getProgressClass(percent) {
-            if (percent >= 80) return 'high';
-            if (percent >= 60) return 'medium';
-            return 'low';
-        }
-        
-        async function loadSystemInfo() {
-            try {
-                const response = await fetch('/api/system');
-                const data = await response.json();
-                
-                if (data.error) {
-                    document.getElementById('deviceInfo').innerHTML = '<div style="color:#f44336;">' + data.error + '</div>';
-                    return;
-                }
-                
-                // 设备信息
-                document.getElementById('deviceInfo').innerHTML = `
-                    <div class="system-item"><span class="system-label">品牌</span><span class="system-value">${data.device.brand}</span></div>
-                    <div class="system-item"><span class="system-label">型号</span><span class="system-value">${data.device.model}</span></div>
-                    <div class="system-item"><span class="system-label">厂商</span><span class="system-value">${data.device.manufacturer}</span></div>
-                    <div class="system-item"><span class="system-label">Android版本</span><span class="system-value">${data.device.version}</span></div>
-                    <div class="system-item"><span class="system-label">API等级</span><span class="system-value">${data.device.sdk}</span></div>
-                    <div class="system-item"><span class="system-label">运行时间</span><span class="system-value">${formatUptime(data.uptime)}</span></div>
-                `;
-                
-                // 电池信息
-                const batteryIcon = data.battery.status === '充电中' ? '🔌' : '🔋';
-                document.getElementById('batteryInfo').innerHTML = `
-                    <div class="system-item"><span class="system-label">电量</span><span class="system-value">${batteryIcon} ${data.battery.level}%</span></div>
-                    <div class="system-item"><span class="system-label">状态</span><span class="system-value">${data.battery.status}</span></div>
-                    <div class="system-item"><span class="system-label">温度</span><span class="system-value">${data.battery.temperature}°C</span></div>
-                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(data.battery.level)}" style="width:${data.battery.level}%"></div></div>
-                `;
-                
-                // 存储信息
-                const storagePercent = Math.round((data.storage.used / data.storage.total) * 100);
-                document.getElementById('storageInfo').innerHTML = `
-                    <div class="system-item"><span class="system-label">总空间</span><span class="system-value">${formatSize(data.storage.total)}</span></div>
-                    <div class="system-item"><span class="system-label">已使用</span><span class="system-value">${formatSize(data.storage.used)} (${storagePercent}%)</span></div>
-                    <div class="system-item"><span class="system-label">可用</span><span class="system-value">${formatSize(data.storage.free)}</span></div>
-                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(storagePercent)}" style="width:${storagePercent}%"></div></div>
-                `;
-                
-                // 内存信息
-                const memoryPercent = Math.round((data.memory.usedMem / data.memory.totalMem) * 100);
-                const memoryWarning = data.memory.lowMemory ? '<span style="color:#f44336;margin-left:10px;">⚠️ 内存不足</span>' : '';
-                document.getElementById('memoryInfo').innerHTML = `
-                    <div class="system-item"><span class="system-label">总内存</span><span class="system-value">${formatSize(data.memory.totalMem)}</span></div>
-                    <div class="system-item"><span class="system-label">已使用</span><span class="system-value">${formatSize(data.memory.usedMem)} (${memoryPercent}%)${memoryWarning}</span></div>
-                    <div class="system-item"><span class="system-label">可用</span><span class="system-value">${formatSize(data.memory.availMem)}</span></div>
-                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(memoryPercent)}" style="width:${memoryPercent}%"></div></div>
-                `;
-            } catch (error) {
-                const errorMsg = '<div style="color:#f44336;">加载失败: ' + error.message + '</div>';
-                document.getElementById('deviceInfo').innerHTML = errorMsg;
-                document.getElementById('batteryInfo').innerHTML = errorMsg;
-                document.getElementById('storageInfo').innerHTML = errorMsg;
-                document.getElementById('memoryInfo').innerHTML = errorMsg;
             }
         }
     </script>
