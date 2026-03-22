@@ -399,17 +399,25 @@ class FileServerService : Service() {
         }
 
         private fun serveDelete(session: IHTTPSession): Response {
+            addLog("=== serveDelete ===")
             val requestBody = HashMap<String, String>()
             session.parseBody(requestBody)
-            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            val body = requestBody["postData"]
+            addLog("Request body: $body")
+            
+            if (body == null) return errorResponse("Missing request body")
             
             try {
                 val json = org.json.JSONObject(body)
                 val path = json.getString("path")
+                addLog("Path: $path")
+                
                 val file = File(path)
+                addLog("File exists: ${file.exists()}, isFile: ${file.isFile}, canRead: ${file.canRead()}")
                 
                 if (!file.exists()) {
-                    return errorResponse("File not found")
+                    addLog("File not found: $path")
+                    return errorResponse("File not found: $path")
                 }
                 
                 // 检查权限：确保路径在允许的范围内
@@ -438,17 +446,23 @@ class FileServerService : Service() {
         }
 
         private fun serveMove(session: IHTTPSession): Response {
+            addLog("=== serveMove ===")
             val requestBody = HashMap<String, String>()
             session.parseBody(requestBody)
-            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            val body = requestBody["postData"]
+            addLog("Request body: $body")
+            
+            if (body == null) return errorResponse("Missing request body")
             
             try {
                 val json = org.json.JSONObject(body)
                 val sourcePath = json.getString("source")
                 val targetDir = json.getString("targetDir")
+                addLog("Source: $sourcePath, TargetDir: $targetDir")
                 
                 val sourceFile = File(sourcePath)
                 val targetDirFile = File(targetDir)
+                addLog("Source exists: ${sourceFile.exists()}, TargetDir exists: ${targetDirFile.exists()}")
                 
                 if (!sourceFile.exists()) {
                     return errorResponse("Source file not found")
@@ -502,7 +516,7 @@ class FileServerService : Service() {
         private fun serveDirectories(session: IHTTPSession): Response {
             val path = session.parameters["path"]?.firstOrNull()?.let {
                 java.net.URLDecoder.decode(it, "UTF-8")
-            } ?: Environment.getExternalStorageDirectory().absolutePath
+            }?.takeIf { it != "/" } ?: Environment.getExternalStorageDirectory().absolutePath
             
             val dir = File(path)
             if (!dir.exists() || !dir.isDirectory) {
@@ -535,22 +549,35 @@ class FileServerService : Service() {
         }
 
         private fun serveMkdir(session: IHTTPSession): Response {
+            addLog("=== serveMkdir ===")
             val requestBody = HashMap<String, String>()
             session.parseBody(requestBody)
-            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            val body = requestBody["postData"]
+            addLog("Request body: $body")
+            
+            if (body == null) return errorResponse("Missing request body")
             
             try {
                 val json = org.json.JSONObject(body)
                 val parentPath = json.getString("parentPath")
                 val dirName = json.getString("dirName")
+                addLog("ParentPath: $parentPath, DirName: $dirName")
                 
                 if (dirName.isEmpty() || dirName.contains("/") || dirName.contains("\\")) {
                     return errorResponse("Invalid directory name")
                 }
                 
                 val parentDir = File(parentPath)
-                if (!parentDir.exists() || !parentDir.isDirectory) {
-                    return errorResponse("Parent directory not found")
+                addLog("ParentDir exists: ${parentDir.exists()}, isDirectory: ${parentDir.isDirectory}, canRead: ${parentDir.canRead()}")
+                
+                if (!parentDir.exists()) {
+                    return errorResponse("Parent directory not found: $parentPath")
+                }
+                if (!parentDir.isDirectory) {
+                    return errorResponse("Parent path is not a directory: $parentPath")
+                }
+                if (!parentDir.canRead()) {
+                    return errorResponse("Cannot read parent directory: $parentPath")
                 }
                 
                 // 检查权限
