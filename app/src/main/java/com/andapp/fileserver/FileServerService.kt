@@ -113,6 +113,7 @@ class FileServerService : Service() {
                 decodedUri == "/api/directories" -> serveDirectories(session)
                 decodedUri == "/api/mkdir" && session.method == Method.POST -> serveMkdir(session)
                 decodedUri == "/api/rename" && session.method == Method.POST -> serveRename(session)
+                decodedUri == "/api/system" -> serveSystem(session)
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -677,6 +678,82 @@ class FileServerService : Service() {
                 }
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error renaming file", e)
+                return errorResponse("Error: ${e.message}")
+            }
+        }
+
+        private fun serveSystem(session: IHTTPSession): Response {
+            try {
+                val json = buildString {
+                    append("{")
+                    
+                    // 设备信息
+                    append("\"device\":{")
+                    append("\"model\":\"${escapeJson(android.os.Build.MODEL)}\",")
+                    append("\"brand\":\"${escapeJson(android.os.Build.BRAND)}\",")
+                    append("\"manufacturer\":\"${escapeJson(android.os.Build.MANUFACTURER)}\",")
+                    append("\"sdk\":${android.os.Build.VERSION.SDK_INT},")
+                    append("\"version\":\"${escapeJson(android.os.Build.VERSION.RELEASE)}\"")
+                    append("},")
+                    
+                    // 电池信息
+                    val batteryIntent = applicationContext.registerReceiver(null, 
+                        android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+                    val batteryLevel = batteryIntent?.let {
+                        val level = it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                        val scale = it.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                        if (level >= 0 && scale > 0) (level * 100 / scale) else -1
+                    } ?: -1
+                    val batteryStatus = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+                    val batteryStatusText = when (batteryStatus) {
+                        android.os.BatteryManager.BATTERY_STATUS_CHARGING -> "充电中"
+                        android.os.BatteryManager.BATTERY_STATUS_DISCHARGING -> "放电中"
+                        android.os.BatteryManager.BATTERY_STATUS_FULL -> "已充满"
+                        android.os.BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "未充电"
+                        else -> "未知"
+                    }
+                    val batteryTemp = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0)?.let { it / 10.0 } ?: 0.0
+                    append("\"battery\":{")
+                    append("\"level\":$batteryLevel,")
+                    append("\"status\":\"$batteryStatusText\",")
+                    append("\"temperature\":$batteryTemp")
+                    append("},")
+                    
+                    // 存储信息
+                    val externalDir = Environment.getExternalStorageDirectory()
+                    val totalStorage = externalDir.totalSpace
+                    val freeStorage = externalDir.freeSpace
+                    val usedStorage = totalStorage - freeStorage
+                    append("\"storage\":{")
+                    append("\"total\":$totalStorage,")
+                    append("\"used\":$usedStorage,")
+                    append("\"free\":$freeStorage")
+                    append("},")
+                    
+                    // 内存信息
+                    val memInfo = android.app.ActivityManager.MemoryInfo()
+                    val activityManager = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    activityManager.getMemoryInfo(memInfo)
+                    append("\"memory\":{")
+                    append("\"totalMem\":${memInfo.totalMem},")
+                    append("\"availMem\":${memInfo.availMem},")
+                    append("\"usedMem\":${memInfo.totalMem - memInfo.availMem},")
+                    append("\"lowMemory\":${memInfo.lowMem}")
+                    append("},")
+                    
+                    // 运行时间
+                    val uptimeMs = android.os.SystemClock.elapsedRealtime()
+                    append("\"uptime\":$uptimeMs,")
+                    
+                    // 当前时间
+                    append("\"currentTime\":${System.currentTimeMillis()}")
+                    
+                    append("}")
+                }
+                
+                return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error getting system info", e)
                 return errorResponse("Error: ${e.message}")
             }
         }

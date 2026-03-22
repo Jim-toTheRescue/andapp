@@ -198,22 +198,145 @@
             border-radius: 4px;
             margin-top: 10px;
         }
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .nav-tab {
+            padding: 10px 20px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .nav-tab:hover {
+            background: #f0f0f0;
+        }
+        .nav-tab.active {
+            background: #1976d2;
+            color: white;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .system-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .system-card h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .system-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .system-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .system-item:last-child {
+            border-bottom: none;
+        }
+        .system-label {
+            color: #666;
+            font-size: 13px;
+        }
+        .system-value {
+            color: #333;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .progress-bar {
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .progress-fill.low {
+            background: #4caf50;
+        }
+        .progress-fill.medium {
+            background: #ff9800;
+        }
+        .progress-fill.high {
+            background: #f44336;
+        }
     </style>
 </head>
 <body>
     <div class="drop-overlay" id="dropOverlay">释放文件以上传</div>
     <div class="container">
         <h1>🤖 瓦力</h1>
-        <div class="breadcrumb" id="breadcrumb"></div>
-        <div class="upload-bar">
-            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
-            <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
-            <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
-            <span class="upload-hint">或拖拽文件到页面上传</span>
-            <div class="upload-progress" id="uploadProgress"></div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchPage('files')">📁 文件管理</button>
+            <button class="nav-tab" onclick="switchPage('system')">📊 系统状态</button>
         </div>
-        <div class="file-list" id="fileList">
-            <div class="loading">Loading...</div>
+        
+        <!-- 文件管理页面 -->
+        <div class="page active" id="page-files">
+            <div class="breadcrumb" id="breadcrumb"></div>
+            <div class="upload-bar">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
+                <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
+                <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
+                <span class="upload-hint">或拖拽文件到页面上传</span>
+                <div class="upload-progress" id="uploadProgress"></div>
+            </div>
+            <div class="file-list" id="fileList">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+        
+        <!-- 系统状态页面 -->
+        <div class="page" id="page-system">
+            <div class="system-card">
+                <h3>📱 设备信息</h3>
+                <div class="system-info" id="deviceInfo">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            <div class="system-card">
+                <h3>🔋 电池状态</h3>
+                <div class="system-info" id="batteryInfo">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            <div class="system-card">
+                <h3>💾 存储空间</h3>
+                <div class="system-info" id="storageInfo">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+            <div class="system-card">
+                <h3>🧠 内存使用</h3>
+                <div class="system-info" id="memoryInfo">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -624,6 +747,92 @@
                 }
             } catch (error) {
                 alert('重命名失败: ' + error.message);
+            }
+        }
+        
+        function switchPage(page) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('page-' + page).classList.add('active');
+            
+            if (page === 'system') {
+                loadSystemInfo();
+            }
+        }
+        
+        function formatUptime(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (days > 0) return days + '天 ' + (hours % 24) + '小时';
+            if (hours > 0) return hours + '小时 ' + (minutes % 60) + '分钟';
+            if (minutes > 0) return minutes + '分钟';
+            return seconds + '秒';
+        }
+        
+        function getProgressClass(percent) {
+            if (percent >= 80) return 'high';
+            if (percent >= 60) return 'medium';
+            return 'low';
+        }
+        
+        async function loadSystemInfo() {
+            try {
+                const response = await fetch('/api/system');
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('deviceInfo').innerHTML = '<div style="color:#f44336;">' + data.error + '</div>';
+                    return;
+                }
+                
+                // 设备信息
+                document.getElementById('deviceInfo').innerHTML = `
+                    <div class="system-item"><span class="system-label">品牌</span><span class="system-value">${data.device.brand}</span></div>
+                    <div class="system-item"><span class="system-label">型号</span><span class="system-value">${data.device.model}</span></div>
+                    <div class="system-item"><span class="system-label">厂商</span><span class="system-value">${data.device.manufacturer}</span></div>
+                    <div class="system-item"><span class="system-label">Android版本</span><span class="system-value">${data.device.version}</span></div>
+                    <div class="system-item"><span class="system-label">API等级</span><span class="system-value">${data.device.sdk}</span></div>
+                    <div class="system-item"><span class="system-label">运行时间</span><span class="system-value">${formatUptime(data.uptime)}</span></div>
+                `;
+                
+                // 电池信息
+                const batteryIcon = data.battery.status === '充电中' ? '🔌' : '🔋';
+                document.getElementById('batteryInfo').innerHTML = `
+                    <div class="system-item"><span class="system-label">电量</span><span class="system-value">${batteryIcon} ${data.battery.level}%</span></div>
+                    <div class="system-item"><span class="system-label">状态</span><span class="system-value">${data.battery.status}</span></div>
+                    <div class="system-item"><span class="system-label">温度</span><span class="system-value">${data.battery.temperature}°C</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(data.battery.level)}" style="width:${data.battery.level}%"></div></div>
+                `;
+                
+                // 存储信息
+                const storagePercent = Math.round((data.storage.used / data.storage.total) * 100);
+                document.getElementById('storageInfo').innerHTML = `
+                    <div class="system-item"><span class="system-label">总空间</span><span class="system-value">${formatSize(data.storage.total)}</span></div>
+                    <div class="system-item"><span class="system-label">已使用</span><span class="system-value">${formatSize(data.storage.used)} (${storagePercent}%)</span></div>
+                    <div class="system-item"><span class="system-label">可用</span><span class="system-value">${formatSize(data.storage.free)}</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(storagePercent)}" style="width:${storagePercent}%"></div></div>
+                `;
+                
+                // 内存信息
+                const memoryPercent = Math.round((data.memory.usedMem / data.memory.totalMem) * 100);
+                const memoryWarning = data.memory.lowMemory ? '<span style="color:#f44336;margin-left:10px;">⚠️ 内存不足</span>' : '';
+                document.getElementById('memoryInfo').innerHTML = `
+                    <div class="system-item"><span class="system-label">总内存</span><span class="system-value">${formatSize(data.memory.totalMem)}</span></div>
+                    <div class="system-item"><span class="system-label">已使用</span><span class="system-value">${formatSize(data.memory.usedMem)} (${memoryPercent}%)${memoryWarning}</span></div>
+                    <div class="system-item"><span class="system-label">可用</span><span class="system-value">${formatSize(data.memory.availMem)}</span></div>
+                    <div class="progress-bar"><div class="progress-fill ${getProgressClass(memoryPercent)}" style="width:${memoryPercent}%"></div></div>
+                `;
+            } catch (error) {
+                const errorMsg = '<div style="color:#f44336;">加载失败: ' + error.message + '</div>';
+                document.getElementById('deviceInfo').innerHTML = errorMsg;
+                document.getElementById('batteryInfo').innerHTML = errorMsg;
+                document.getElementById('storageInfo').innerHTML = errorMsg;
+                document.getElementById('memoryInfo').innerHTML = errorMsg;
             }
         }
     </script>
