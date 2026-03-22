@@ -877,7 +877,7 @@ class FileServerService : Service() {
                     html += '</div>';
                     html += '</div>';
                     html += '<div class="file-actions">';
-                    html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
+                    html += '<a class="btn btn-download" href="/download/' + filePath + '" download>下载</a>';
                     html += '<button class="btn btn-move" onclick="showMoveDialog(\'' + filePath.replace(/'/g, "\\'") + '\')">移动</button>';
                     html += '<button class="btn btn-delete" onclick="deleteFile(\'' + filePath.replace(/'/g, "\\'") + '\')">删除</button>';
                     html += '</div>';
