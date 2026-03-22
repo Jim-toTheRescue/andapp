@@ -663,7 +663,7 @@ class FileServerService : Service() {
             } else {
                 // 普通请求
                 val fis = FileInputStream(file)
-                val response = newChunkedResponse(Response.Status.OK, mimeType, fis)
+                val response = newChunkedResponse(NanoHTTPD.Response.Status.OK, mimeType, fis)
                 response.addHeader("Accept-Ranges", "bytes")
                 response.addHeader("Content-Length", fileLength.toString())
                 return response
