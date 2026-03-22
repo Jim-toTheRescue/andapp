@@ -332,26 +332,36 @@ class MainActivity : AppCompatActivity() {
 
     private fun fetchLatestRelease(): Triple<String, String, String>? {
         return try {
+            FileServerService.addLog("更新检查: 正在请求 $GITHUB_API_URL")
             val url = URL(GITHUB_API_URL)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("Accept", "application/json")
             connection.connectTimeout = 10000
             
-            if (connection.responseCode == 200) {
+            val responseCode = connection.responseCode
+            FileServerService.addLog("更新检查: 响应状态码=$responseCode")
+            
+            if (responseCode == 200) {
                 val response = connection.inputStream.bufferedReader().readText()
+                FileServerService.addLog("更新检查: 获取到 Release 数据，长度=${response.length}")
                 val json = JSONObject(response)
                 
                 val tagName = json.getString("tag_name")
                 val name = json.optString("name", "Latest Build")
+                FileServerService.addLog("更新检查: tag=$tagName, name=$name")
                 
                 val assets = json.getJSONArray("assets")
                 var downloadUrl = ""
+                FileServerService.addLog("更新检查: 附件数量=${assets.length()}")
                 
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
-                    if (asset.getString("name").endsWith(".apk")) {
+                    val assetName = asset.getString("name")
+                    FileServerService.addLog("更新检查: 附件[$i] name=$assetName")
+                    if (assetName.endsWith(".apk")) {
                         downloadUrl = asset.getString("browser_download_url")
+                        FileServerService.addLog("更新检查: 找到 APK=$downloadUrl")
                         break
                     }
                 }
@@ -359,12 +369,15 @@ class MainActivity : AppCompatActivity() {
                 if (downloadUrl.isNotEmpty()) {
                     Triple(tagName, downloadUrl, name)
                 } else {
+                    FileServerService.addLog("更新检查: 未找到 APK 附件")
                     null
                 }
             } else {
+                FileServerService.addLog("更新检查: HTTP 错误 $responseCode")
                 null
             }
         } catch (e: Exception) {
+            FileServerService.addLog("更新检查: 异常=${e.javaClass.simpleName}: ${e.message}")
             null
         }
     }
