@@ -568,8 +568,8 @@ class FileServerService : Service() {
                 val success = newDir.mkdirs()
                 
                 return if (success) {
-                    newFixedLengthResponse(Response.Status.OK, "application/json", 
-                        """{"success":true,"message":"Directory created","path":"${escapeJson(newDir.absolutePath)}"}""")
+                    val json = """{"success":true,"message":"Directory created","path":"${escapeJson(newDir.absolutePath)}"}"""
+                    newFixedLengthResponse(Response.Status.OK, "application/json", json)
                 } else {
                     errorResponse("Failed to create directory")
                 }
@@ -973,8 +973,8 @@ class FileServerService : Service() {
                     html += '</div>';
                     html += '<div class="file-actions">';
                     html += '<a class="btn btn-download" href="/download/' + filePath + '" download>下载</a>';
-                    html += '<button class="btn btn-move" onclick="showMoveDialog(\'' + filePath.replace(/'/g, "\\'") + '\')">移动</button>';
-                    html += '<button class="btn btn-delete" onclick="deleteFile(\'' + filePath.replace(/'/g, "\\'") + '\')">删除</button>';
+                    html += "<button class=\"btn btn-move\" onclick=\"showMoveDialog('" + filePath.replace(/'/g, "\\'") + "')\">移动</button>";
+                    html += "<button class=\"btn btn-delete\" onclick=\"deleteFile('" + filePath.replace(/'/g, "\\'") + "')\">删除</button>";
                     html += '</div>';
                     html += '</div>';
                 });
