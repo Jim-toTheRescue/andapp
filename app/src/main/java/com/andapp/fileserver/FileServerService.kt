@@ -1134,21 +1134,19 @@ class FileServerService : Service() {
             modal.id = 'moveModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2000;';
             
-            modal.innerHTML = `
-                <div style="background:white;border-radius:12px;width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">
-                    <div style="padding:16px;border-bottom:1px solid #eee;">
-                        <h3 style="margin:0 0 8px 0;">选择目标目录</h3>
-                        <div id="currentDirPath" style="font-size:13px;color:#666;word-break:break-all;">/</div>
-                    </div>
-                    <div id="directoryList" style="flex:1;overflow-y:auto;padding:8px 0;">
-                        <div style="padding:20px;text-align:center;color:#999;">加载中...</div>
-                    </div>
-                    <div style="padding:16px;border-top:1px solid #eee;display:flex;gap:10px;">
-                        <button onclick="closeMoveDialog()" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;">取消</button>
-                        <button onclick="confirmMove()" style="flex:1;padding:10px;border:none;border-radius:6px;background:#1976d2;color:white;cursor:pointer;">移动到这里</button>
-                    </div>
-                </div>
-            `;
+            modal.innerHTML = '<div style="background:white;border-radius:12px;width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
+                '<div style="padding:16px;border-bottom:1px solid #eee;">' +
+                    '<h3 style="margin:0 0 8px 0;">选择目标目录</h3>' +
+                    '<div id="currentDirPath" style="font-size:13px;color:#666;word-break:break-all;">/</div>' +
+                '</div>' +
+                '<div id="directoryList" style="flex:1;overflow-y:auto;padding:8px 0;">' +
+                    '<div style="padding:20px;text-align:center;color:#999;">加载中...</div>' +
+                '</div>' +
+                '<div style="padding:16px;border-top:1px solid #eee;display:flex;gap:10px;">' +
+                    '<button onclick="closeMoveDialog()" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;">取消</button>' +
+                    '<button onclick="confirmMove()" style="flex:1;padding:10px;border:none;border-radius:6px;background:#1976d2;color:white;cursor:pointer;">移动到这里</button>' +
+                '</div>' +
+            '</div>';
             
             document.body.appendChild(modal);
             loadDirectories('/');
