@@ -38,8 +38,9 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          VERSION_NAME=$(grep 'versionName' app/build.gradle | awk -F'"' '{print $2}')
-          VERSION_CODE=$(grep 'versionCode' app/build.gradle | awk '{print $2}')
+          # 获取当前时间戳作为版本号
+          VERSION_NAME=$(date +%Y%m%d.%H%M)
+          VERSION_CODE=$(date +%s)
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "version_name=$VERSION_NAME"
@@ -74,7 +75,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "瓦力 Latest Build"
+          name: "瓦力 ${{ steps.version.outputs.version_name }}"
           body: |
             ## 瓦力 Android App
             
