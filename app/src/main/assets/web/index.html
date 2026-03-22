@@ -1,3 +1,4 @@
+            return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,18 +166,6 @@
         .mkdir-btn:hover {
             background: #1976d2;
         }
-        .update-btn {
-            background: #ff9800;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .update-btn:hover {
-            background: #f57c00;
-        }
         .upload-hint {
             color: #999;
             font-size: 13px;
@@ -214,7 +203,6 @@
             <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
             <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
             <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
-            <button class="update-btn" onclick="checkUpdate()">检查更新</button>
             <span class="upload-hint">或拖拽文件到页面上传</span>
             <div class="upload-progress" id="uploadProgress"></div>
         </div>
@@ -311,7 +299,7 @@
                     html += '<div class="file-icon">' + icon + '</div>';
                     html += '<div class="file-info">';
                     if (isDir) {
-                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(&quot;data-path&quot;))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
+                        html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
                     } else {
                         html += '<a class="file-name" href="' + filePath + '" target="_blank">' + name + '</a>';
                     }
@@ -482,19 +470,21 @@
             modal.id = 'moveModal';
             modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2000;';
             
-            modal.innerHTML = '<div style="background:white;border-radius:12px;width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">' +
-                '<div style="padding:16px;border-bottom:1px solid #eee;">' +
-                    '<h3 style="margin:0 0 8px 0;">选择目标目录</h3>' +
-                    '<div id="currentDirPath" style="font-size:13px;color:#666;word-break:break-all;">/</div>' +
-                '</div>' +
-                '<div id="directoryList" style="flex:1;overflow-y:auto;padding:8px 0;">' +
-                    '<div style="padding:20px;text-align:center;color:#999;">加载中...</div>' +
-                '</div>' +
-                '<div style="padding:16px;border-top:1px solid #eee;display:flex;gap:10px;">' +
-                    '<button onclick="closeMoveDialog()" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;">取消</button>' +
-                    '<button onclick="confirmMove()" style="flex:1;padding:10px;border:none;border-radius:6px;background:#1976d2;color:white;cursor:pointer;">移动到这里</button>' +
-                '</div>' +
-            '</div>';
+            modal.innerHTML = `
+                <div style="background:white;border-radius:12px;width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;">
+                    <div style="padding:16px;border-bottom:1px solid #eee;">
+                        <h3 style="margin:0 0 8px 0;">选择目标目录</h3>
+                        <div id="currentDirPath" style="font-size:13px;color:#666;word-break:break-all;">/</div>
+                    </div>
+                    <div id="directoryList" style="flex:1;overflow-y:auto;padding:8px 0;">
+                        <div style="padding:20px;text-align:center;color:#999;">加载中...</div>
+                    </div>
+                    <div style="padding:16px;border-top:1px solid #eee;display:flex;gap:10px;">
+                        <button onclick="closeMoveDialog()" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:6px;background:white;cursor:pointer;">取消</button>
+                        <button onclick="confirmMove()" style="flex:1;padding:10px;border:none;border-radius:6px;background:#1976d2;color:white;cursor:pointer;">移动到这里</button>
+                    </div>
+                </div>
+            `;
             
             document.body.appendChild(modal);
             loadDirectories('/');
@@ -520,22 +510,22 @@
                 
                 // 返回上级目录
                 if (data.parentPath) {
-                    html += '<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;" onclick="loadDirectories(\'' + data.parentPath.replace(/'/g, "\\'") + '\')">' +
-                        '<span style="font-size:18px;">📁</span>' +
-                        '<span style="color:#1976d2;">.. 返回上级</span>' +
-                    '</div>';
+                    html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;\" onclick=\"loadDirectories('" + data.parentPath.replace(/'/g, "\\'") + "')\">" +
+                        "<span style=\"font-size:18px;\">📁</span>" +
+                        "<span style=\"color:#1976d2;\">.. 返回上级</span>" +
+                    "</div>";
                 }
                 
                 // 目录列表
                 if (data.directories && data.directories.length > 0) {
                     data.directories.forEach(dir => {
-                        html += '<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;" ' +
-                            'onclick="loadDirectories(\'' + dir.path.replace(/'/g, "\\'") + '\')" ' +
-                            'onmouseover="this.style.background=\'#f5f5f5\'" ' +
-                            'onmouseout="this.style.background=\'white\'">' +
-                            '<span style="font-size:18px;">📁</span>' +
-                            '<span>' + dir.name + '</span>' +
-                        '</div>';
+                        html += "<div style=\"padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f5f5f5;\" " +
+                            "onclick=\"loadDirectories('" + dir.path.replace(/'/g, "\\'") + "')\" " +
+                            "onmouseover=\"this.style.background='#f5f5f5'\" " +
+                            "onmouseout=\"this.style.background='white'\">" +
+                            "<span style=\"font-size:18px;\">📁</span>" +
+                            "<span>" + dir.name + "</span>" +
+                        "</div>";
                     });
                 } else {
                     html += '<div style="padding:20px;text-align:center;color:#999;">此目录没有子文件夹</div>';
@@ -602,39 +592,6 @@
             } catch (error) {
                 alert('创建失败: ' + error.message);
             }
-        }
-        
-        async function checkUpdate() {
-            const btn = document.querySelector('.update-btn');
-            btn.textContent = '检查中...';
-            btn.disabled = true;
-            
-            try {
-                const versionRes = await fetch('/api/version');
-                const localVersion = await versionRes.json();
-                
-                const releaseRes = await fetch('https://api.github.com/repos/Jim-toTheRescue/andapp/releases/tags/latest');
-                const release = await releaseRes.json();
-                
-                if (release.assets && release.assets.length > 0) {
-                    const apk = release.assets[0];
-                    const updateInfo = '当前版本: ' + localVersion.versionName + '\n' +
-                        '最新构建: ' + release.name + '\n' +
-                        '发布时间: ' + new Date(release.published_at).toLocaleString() + '\n\n' +
-                        '是否下载更新?';
-                    
-                    if (confirm(updateInfo)) {
-                        window.open(apk.browser_download_url, '_blank');
-                    }
-                } else {
-                    alert('未找到发布版本');
-                }
-            } catch (error) {
-                alert('检查更新失败: ' + error.message);
-            }
-            
-            btn.textContent = '检查更新';
-            btn.disabled = false;
         }
     </script>
 </body>
