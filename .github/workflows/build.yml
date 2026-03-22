@@ -25,14 +25,28 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
         
-      # 【核心优化】全流程只生成一次版本信息
+      - name: Generate debug keystore if not exists
+        run: |
+          if [ ! -f app/debug.keystore ]; then
+            keytool -genkey -v -keystore app/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -storepass android -keypass android
+            
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git add app/debug.keystore
+            git commit -m "chore: add debug keystore"
+            git push
+          fi
+        
       - name: Generate Version Env
         id: version_env
         run: |
           echo "v_code=${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "v_name=1.0.${{ github.run_number }}" >> $GITHUB_OUTPUT
 
-      # 【修正】显式传递变量，确保不出现 null
       - name: Build Debug APK
         run: |
           ./gradlew assembleDebug \
@@ -51,6 +65,5 @@ jobs:
             - **提交信息**: ${{ github.event.head_commit.message }}
           files: app/build/outputs/apk/debug/*.apk
           prerelease: true
-          # 【黑科技】开启此项后，会自动覆盖旧的 latest Release 和文件，无需手动脚本删除
           allowUpdates: true
           make_latest: true
