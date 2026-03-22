@@ -108,6 +108,8 @@ class FileServerService : Service() {
                 decodedUri.startsWith("/download/") -> serveDownload(decodedUri)
                 decodedUri == "/upload/chunk" -> serveUploadChunk(session)
                 decodedUri.startsWith("/api/files") -> serveFileList(session)
+                decodedUri == "/api/delete" && session.method == Method.POST -> serveDelete(session)
+                decodedUri == "/api/move" && session.method == Method.POST -> serveMove(session)
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -394,6 +396,112 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "application/json", json)
         }
 
+        private fun serveDelete(session: IHTTPSession): Response {
+            val requestBody = HashMap<String, String>()
+            session.parseBody(requestBody)
+            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            
+            try {
+                val json = org.json.JSONObject(body)
+                val path = json.getString("path")
+                val file = File(path)
+                
+                if (!file.exists()) {
+                    return errorResponse("File not found")
+                }
+                
+                // 检查权限：确保路径在允许的范围内
+                val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                if (!file.absolutePath.startsWith(externalPath) && 
+                    !file.absolutePath.startsWith(filesDir.absolutePath)) {
+                    return errorResponse("Permission denied")
+                }
+                
+                val success = if (file.isDirectory) {
+                    file.deleteRecursively()
+                } else {
+                    file.delete()
+                }
+                
+                return if (success) {
+                    newFixedLengthResponse(Response.Status.OK, "application/json", 
+                        """{"success":true,"message":"Deleted successfully"}""")
+                } else {
+                    errorResponse("Failed to delete file")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error deleting file", e)
+                return errorResponse("Error: ${e.message}")
+            }
+        }
+
+        private fun serveMove(session: IHTTPSession): Response {
+            val requestBody = HashMap<String, String>()
+            session.parseBody(requestBody)
+            val body = requestBody["postData"] ?: return errorResponse("Missing request body")
+            
+            try {
+                val json = org.json.JSONObject(body)
+                val sourcePath = json.getString("source")
+                val targetDir = json.getString("targetDir")
+                
+                val sourceFile = File(sourcePath)
+                val targetDirFile = File(targetDir)
+                
+                if (!sourceFile.exists()) {
+                    return errorResponse("Source file not found")
+                }
+                
+                if (!targetDirFile.exists() || !targetDirFile.isDirectory) {
+                    return errorResponse("Target directory not found")
+                }
+                
+                // 检查权限
+                val externalPath = Environment.getExternalStorageDirectory().absolutePath
+                if (!sourceFile.absolutePath.startsWith(externalPath) && 
+                    !sourceFile.absolutePath.startsWith(filesDir.absolutePath)) {
+                    return errorResponse("Permission denied")
+                }
+                
+                val targetFile = File(targetDirFile, sourceFile.name)
+                
+                // 检查目标是否已存在
+                if (targetFile.exists()) {
+                    return errorResponse("File already exists in target directory")
+                }
+                
+                // 使用renameTo进行高效移动（不会复制数据）
+                var success = sourceFile.renameTo(targetFile)
+                
+                // 如果renameTo失败（比如跨文件系统），使用复制+删除
+                if (!success) {
+                    android.util.Log.w("FileServer", "renameTo failed, trying copy+delete")
+                    success = try {
+                        sourceFile.copyTo(targetFile)
+                        sourceFile.delete()
+                        true
+                    } catch (e: Exception) {
+                        false
+                    }
+                }
+                
+                return if (success) {
+                    newFixedLengthResponse(Response.Status.OK, "application/json", 
+                        """{"success":true,"message":"Moved successfully","newPath":"${escapeJson(targetFile.absolutePath)}"}""")
+                } else {
+                    errorResponse("Failed to move file")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FileServer", "Error moving file", e)
+                return errorResponse("Error: ${e.message}")
+            }
+        }
+
+        private fun errorResponse(message: String): Response {
+            return newFixedLengthResponse(Response.Status.OK, "application/json", 
+                """{"success":false,"error":"${escapeJson(message)}"}""")
+        }
+
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
@@ -586,6 +694,20 @@ class FileServerService : Service() {
         .btn-download:hover {
             background: #1565c0;
         }
+        .btn-move {
+            background: #ff9800;
+            color: white;
+        }
+        .btn-move:hover {
+            background: #f57c00;
+        }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #d32f2f;
+        }
         .empty {
             padding: 40px;
             text-align: center;
@@ -759,11 +881,11 @@ class FileServerService : Service() {
                     html += ' • ' + date;
                     html += '</div>';
                     html += '</div>';
-                    if (!isDir) {
-                        html += '<div class="file-actions">';
-                        html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
-                        html += '</div>';
-                    }
+                    html += '<div class="file-actions">';
+                    html += '<a class="btn btn-download" href="/download/' + filePath + '" download>Download</a>';
+                    html += '<button class="btn btn-move" onclick="showMoveDialog(\'' + filePath.replace(/'/g, "\\'") + '\')">移动</button>';
+                    html += '<button class="btn btn-delete" onclick="deleteFile(\'' + filePath.replace(/'/g, "\\'") + '\')">删除</button>';
+                    html += '</div>';
                     html += '</div>';
                 });
                 
@@ -886,6 +1008,54 @@ class FileServerService : Service() {
         
         const initialPath = new URLSearchParams(window.location.search).get('path') || '';
         loadFiles(initialPath, false);
+        
+        async function deleteFile(path) {
+            if (!confirm('确定要删除此文件/文件夹吗？')) return;
+            
+            try {
+                const response = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadFiles(currentPath);
+                } else {
+                    alert('删除失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        async function showMoveDialog(sourcePath) {
+            // 显示目录选择对话框
+            const targetDir = prompt('请输入目标目录路径:\n(当前路径: ' + (currentPath || '根目录') + ')', currentPath || '/');
+            
+            if (!targetDir) return;
+            
+            if (!confirm('确定要移动到 "' + targetDir + '" 吗？')) return;
+            
+            try {
+                const response = await fetch('/api/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: sourcePath, targetDir: targetDir })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    loadFiles(currentPath);
+                    alert('移动成功');
+                } else {
+                    alert('移动失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                alert('移动失败: ' + error.message);
+            }
+        }
     </script>
 </body>
 </html>
