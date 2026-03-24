@@ -303,6 +303,10 @@
                 <button class="upload-btn" onclick="document.getElementById('fileInput').click()">上传文件</button>
                 <input type="file" id="fileInput" multiple style="display:none" onchange="uploadFiles(this.files)">
                 <button class="mkdir-btn" onclick="showMkdirDialog()">新建文件夹</button>
+                <select id="sortSelect" onchange="changeSort(this.value)" style="padding:8px 12px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                    <option value="date">按时间排序</option>
+                    <option value="name">按名称排序</option>
+                </select>
                 <span class="upload-hint">或拖拽文件到页面上传</span>
                 <div class="upload-progress" id="uploadProgress"></div>
             </div>
@@ -346,7 +350,8 @@
         function renderBreadcrumb(path) {
             const parts = path ? path.split('/') : [];
             let html = "<a href=\"#\" onclick=\"loadFiles('')\">🏠 Root</a>";
-            let currentPath = '';
+        let currentPath = '';
+        let currentSort = 'date';
             
             parts.forEach((part, index) => {
                 if (part) {
@@ -371,7 +376,8 @@
             fileList.innerHTML = '<div class="loading">Loading...</div>';
             
             try {
-                const url = path ? '/api/files?path=' + encodeURIComponent(path) : '/api/files';
+                let url = path ? '/api/files?path=' + encodeURIComponent(path) : '/api/files';
+                url += '&sort=' + currentSort;
                 const response = await fetch(url);
                 const data = await response.json();
                 
@@ -537,6 +543,11 @@
         
         const initialPath = new URLSearchParams(window.location.search).get('path') || '';
         loadFiles(initialPath, false);
+        
+        function changeSort(sort) {
+            currentSort = sort;
+            loadFiles(currentPath, false);
+        }
         
         async function deleteFile(path) {
             if (!confirm('确定要删除此文件/文件夹吗？')) return;

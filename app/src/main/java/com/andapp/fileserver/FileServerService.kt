@@ -378,10 +378,17 @@ class FileServerService : Service() {
                 return newFixedLengthResponse(Response.Status.OK, "application/json", """{"error":"Permission denied","path":"${escapeJson(path)}"}""")
             }
 
+            val sortBy = session.parameters["sort"]?.firstOrNull() ?: "date"
+            
             val files = try {
                 dir.listFiles()?.filter { 
                     try { it.canRead() } catch (e: Exception) { false }
-                }?.sortedWith(compareBy<File> { !it.isDirectory }.thenByDescending { it.lastModified() }) ?: emptyList()
+                }?.sortedWith(compareBy<File> { !it.isDirectory }.let { comparator ->
+                    when (sortBy) {
+                        "name" -> comparator.thenBy { it.name.lowercase() }
+                        else -> comparator.thenByDescending { it.lastModified() }
+                    }
+                }) ?: emptyList()
             } catch (e: Exception) {
                 android.util.Log.e("FileServer", "Error listing files", e)
                 emptyList()
