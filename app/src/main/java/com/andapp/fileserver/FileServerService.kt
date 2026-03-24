@@ -386,6 +386,8 @@ class FileServerService : Service() {
                 }?.sortedWith(compareBy<File> { !it.isDirectory }.let { comparator ->
                     when (sortBy) {
                         "name" -> comparator.thenBy { it.name.lowercase() }
+                        "size" -> comparator.thenByDescending { it.length() }
+                        "type" -> comparator.thenBy { getFileExtension(it.name).lowercase() }
                         else -> comparator.thenByDescending { it.lastModified() }
                     }
                 }) ?: emptyList()
@@ -750,6 +752,11 @@ class FileServerService : Service() {
                 response.addHeader("Content-Length", fileLength.toString())
                 return response
             }
+        }
+
+        private fun getFileExtension(fileName: String): String {
+            val dotIndex = fileName.lastIndexOf('.')
+            return if (dotIndex > 0) fileName.substring(dotIndex + 1) else ""
         }
 
         private fun getMimeType(fileName: String): String {
