@@ -318,6 +318,7 @@
     
     <script>
         let currentPath = '';
+        let currentSort = 'date';
         
         function formatSize(bytes) {
             if (bytes === 0) return '0 B';
@@ -350,8 +351,7 @@
         function renderBreadcrumb(path) {
             const parts = path ? path.split('/') : [];
             let html = "<a href=\"#\" onclick=\"loadFiles('')\">🏠 Root</a>";
-        let currentPath = '';
-        let currentSort = 'date';
+            let currentPath = '';
             
             parts.forEach((part, index) => {
                 if (part) {
