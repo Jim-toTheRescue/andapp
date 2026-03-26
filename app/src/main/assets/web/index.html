@@ -448,6 +448,7 @@
         function uploadFiles(files) {
             if (!files || files.length === 0) return;
             
+            const uploadTargetPath = currentPath; // 锁定上传目标路径
             const progress = document.getElementById('uploadProgress');
             progress.style.display = 'block';
             
@@ -481,7 +482,7 @@
                     progress.textContent = file.name + '\n' + formatProgress(end, file.size);
                     
                     const url = '/upload/chunk?filename=' + encodeURIComponent(file.name) + 
-                               '&path=' + encodeURIComponent(currentPath || '') + 
+                               '&path=' + encodeURIComponent(uploadTargetPath || '') + 
                                '&chunk=' + chunkIndex + 
                                '&last=' + isLast;
                     
