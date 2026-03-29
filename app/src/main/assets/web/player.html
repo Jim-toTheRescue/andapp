@@ -330,14 +330,14 @@
                 const response = await fetch(url);
                 const data = await response.json();
                 
-                if (data.files) {
-                    videoList = data.files.filter(f => !f.isDirectory && isVideoFile(f.name));
-                    renderVideoList();
-                    
-                    const currentFileName = decodeURIComponent(videoPath.split('/').pop());
-                    currentIndex = videoList.findIndex(v => v.name === currentFileName);
-                    updateNavButtons();
-                }
+                // API返回的是数组格式 [{name, path, isDirectory, size, lastModified}]
+                const files = Array.isArray(data) ? data : (data.files || []);
+                videoList = files.filter(f => !f.isDirectory && isVideoFile(f.name));
+                renderVideoList();
+                
+                const currentFileName = decodeURIComponent(videoPath.split('/').pop());
+                currentIndex = videoList.findIndex(v => v.name === currentFileName);
+                updateNavButtons();
             } catch (error) {
                 console.error('加载视频列表失败:', error);
                 videoListEl.innerHTML = '<div style="padding: 20px; color: #f44336;">加载列表失败</div>';
