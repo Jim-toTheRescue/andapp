@@ -309,6 +309,7 @@
         
         const urlParams = new URLSearchParams(window.location.search);
         const videoPath = urlParams.get('src');
+        const sortOrder = urlParams.get('sort') || 'date';
         
         function isVideoFile(filename) {
             const ext = filename.split('.').pop().toLowerCase();
@@ -326,7 +327,8 @@
             const dirPath = parts.join('/');
             
             try {
-                const url = dirPath ? '/api/files?path=' + encodeURIComponent(dirPath) : '/api/files';
+                let url = dirPath ? '/api/files?path=' + encodeURIComponent(dirPath) : '/api/files';
+                url += '&sort=' + sortOrder;
                 const response = await fetch(url);
                 const data = await response.json();
                 
