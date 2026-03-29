@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频播放器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding: 12px 16px;
+            background: #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .back-btn {
+            color: #4fc3f7;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        
+        .back-btn:hover {
+            background: rgba(79, 195, 247, 0.1);
+        }
+        
+        .file-name {
+            flex: 1;
+            font-size: 14px;
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .player-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        video {
+            max-width: 100%;
+            max-height: calc(100vh - 200px);
+            background: #000;
+            border-radius: 8px;
+        }
+        
+        .controls {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .control-btn {
+            background: #333;
+            border: none;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .control-btn:hover {
+            background: #444;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .control-btn.rewind {
+            background: #1565c0;
+        }
+        
+        .control-btn.forward {
+            background: #1565c0;
+        }
+        
+        .control-btn.play {
+            background: #2e7d32;
+            padding: 12px 24px;
+        }
+        
+        .step-info {
+            color: #888;
+            font-size: 14px;
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border-radius: 6px;
+        }
+        
+        .time-display {
+            color: #4fc3f7;
+            font-size: 14px;
+            font-family: monospace;
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border-radius: 6px;
+        }
+        
+        .keyboard-hints {
+            margin-top: 20px;
+            padding: 16px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #888;
+        }
+        
+        .keyboard-hints h3 {
+            color: #ccc;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .keyboard-hints div {
+            margin: 6px 0;
+        }
+        
+        .keyboard-hints kbd {
+            background: #444;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #fff;
+        }
+        
+        .loading {
+            color: #888;
+            font-size: 18px;
+        }
+        
+        .error {
+            color: #f44336;
+            font-size: 16px;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="back-btn">&larr; 返回</a>
+        <div class="file-name" id="fileName">加载中...</div>
+    </div>
+    
+    <div class="player-container">
+        <div class="loading" id="loading">正在加载视频...</div>
+        <video id="videoPlayer" style="display:none;" controls>
+            您的浏览器不支持视频播放
+        </video>
+        
+        <div class="controls" id="controls" style="display:none;">
+            <button class="control-btn rewind" onclick="rewind()">
+                &larr; 快退
+            </button>
+            <button class="control-btn play" id="playBtn" onclick="togglePlay()">
+                播放
+            </button>
+            <button class="control-btn forward" onclick="forward()">
+                快进 &rarr;
+            </button>
+            <div class="step-info" id="stepInfo">步长: 5秒</div>
+            <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
+        </div>
+        
+        <div class="keyboard-hints" id="keyboardHints" style="display:none;">
+            <h3>键盘快捷键</h3>
+            <div><kbd>&larr;</kbd> 快退5秒</div>
+            <div><kbd>&rarr;</kbd> 快进5秒</div>
+            <div><kbd>空格</kbd> 播放/暂停</div>
+            <div><kbd>J</kbd> 快退10秒</div>
+            <div><kbd>L</kbd> 快进10秒</div>
+            <div><kbd>F</kbd> 全屏</div>
+        </div>
+    </div>
+    
+    <script>
+        const video = document.getElementById('videoPlayer');
+        const loading = document.getElementById('loading');
+        const controls = document.getElementById('controls');
+        const playBtn = document.getElementById('playBtn');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const stepInfo = document.getElementById('stepInfo');
+        const fileNameEl = document.getElementById('fileName');
+        const keyboardHints = document.getElementById('keyboardHints');
+        
+        const DEFAULT_STEP = 5;
+        const LARGE_STEP = 10;
+        
+        let currentStep = DEFAULT_STEP;
+        
+        // 从URL参数获取视频路径
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoPath = urlParams.get('src');
+        
+        if (!videoPath) {
+            loading.innerHTML = '<div class="error">未指定视频文件</div>';
+        } else {
+            // 显示文件名
+            const parts = videoPath.split('/');
+            fileNameEl.textContent = decodeURIComponent(parts[parts.length - 1]);
+            
+            // 加载视频
+            video.src = videoPath;
+            video.style.display = 'block';
+            
+            video.addEventListener('loadedmetadata', function() {
+                loading.style.display = 'none';
+                controls.style.display = 'flex';
+                keyboardHints.style.display = 'block';
+                updateTimeDisplay();
+            });
+            
+            video.addEventListener('error', function() {
+                loading.innerHTML = '<div class="error">视频加载失败，请检查文件是否存在</div>';
+            });
+            
+            video.addEventListener('timeupdate', updateTimeDisplay);
+            video.addEventListener('play', () => playBtn.textContent = '暂停');
+            video.addEventListener('pause', () => playBtn.textContent = '播放');
+        }
+        
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '00:00';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            
+            if (h > 0) {
+                return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+        
+        function updateTimeDisplay() {
+            const current = formatTime(video.currentTime);
+            const total = formatTime(video.duration);
+            timeDisplay.textContent = `${current} / ${total}`;
+        }
+        
+        function rewind(step) {
+            step = step || currentStep;
+            video.currentTime = Math.max(0, video.currentTime - step);
+            showStepHint(`快退 ${step} 秒`);
+        }
+        
+        function forward(step) {
+            step = step || currentStep;
+            video.currentTime = Math.min(video.duration, video.currentTime + step);
+            showStepHint(`快进 ${step} 秒`);
+        }
+        
+        function togglePlay() {
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+        
+        function showStepHint(text) {
+            stepInfo.textContent = text;
+            setTimeout(() => {
+                stepInfo.textContent = `步长: ${currentStep}秒`;
+            }, 500);
+        }
+        
+        // 键盘事件
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    rewind(DEFAULT_STEP);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    forward(DEFAULT_STEP);
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'j':
+                case 'J':
+                    e.preventDefault();
+                    rewind(LARGE_STEP);
+                    break;
+                case 'l':
+                case 'L':
+                    e.preventDefault();
+                    forward(LARGE_STEP);
+                    break;
+                case 'f':
+                case 'F':
+                    e.preventDefault();
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    } else {
+                        video.requestFullscreen();
+                    }
+                    break;
+            }
+        });
+        
+        // 双击全屏
+        video.addEventListener('dblclick', function() {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                video.requestFullscreen();
+            }
+        });
+    </script>
+</body>
+</html>

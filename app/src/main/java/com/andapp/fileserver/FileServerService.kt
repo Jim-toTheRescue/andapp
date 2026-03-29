@@ -117,6 +117,7 @@ class FileServerService : Service() {
                 decodedUri == "/api/rename" && session.method == Method.POST -> serveRename(session)
                 decodedUri == "/api/system" -> serveSystem()
                 decodedUri == "/system" -> serveSystemPage()
+                decodedUri.startsWith("/player") -> servePlayerPage(session)
                 else -> serveFile(session, decodedUri)
             }
         }
@@ -709,6 +710,11 @@ class FileServerService : Service() {
             return newFixedLengthResponse(Response.Status.OK, "text/html", html)
         }
 
+        private fun servePlayerPage(session: IHTTPSession): Response {
+            val html = generatePlayerHtml()
+            return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        }
+
         private fun serveFile(session: IHTTPSession, uri: String): Response {
             val file = File(uri)
             
@@ -809,6 +815,15 @@ class FileServerService : Service() {
                 assets.open("web/system.html").bufferedReader().use { it.readText() }
             } catch (e: Exception) {
                 addLog("Failed to load system.html: ${e.message}")
+                "<html><body><h1>Error loading page</h1><p>${e.message}</p></body></html>"
+            }
+        }
+
+        private fun generatePlayerHtml(): String {
+            return try {
+                assets.open("web/player.html").bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                addLog("Failed to load player.html: ${e.message}")
                 "<html><body><h1>Error loading page</h1><p>${e.message}</p></body></html>"
             }
         }
