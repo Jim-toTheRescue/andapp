@@ -354,6 +354,11 @@
             const ext = filename.split('.').pop().toLowerCase();
             return ['mp4', 'mkv', 'avi', 'webm', 'mov', 'wmv', 'flv', 'm4v', '3gp', 'ogv'].includes(ext);
         }
+
+        function isImageFile(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
+        }
         
         function renderBreadcrumb(path) {
             const parts = path ? path.split('/') : [];
@@ -414,7 +419,7 @@
                     html += '<div class="file-info">';
                     if (isDir) {
                         html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
-                    } else if (isVideoFile(name)) {
+                    } else if (isVideoFile(name) || isImageFile(name)) {
                         html += '<a class="file-name" href="/player?src=' + encodeURIComponent(filePath) + '&sort=' + currentSort + '" target="_blank">' + name + '</a>';
                     } else {
                         html += '<a class="file-name" href="' + filePath + '" target="_blank">' + name + '</a>';

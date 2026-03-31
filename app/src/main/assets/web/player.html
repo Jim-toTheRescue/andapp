@@ -42,39 +42,46 @@
             margin-bottom: 8px;
         }
         
-        .back-link {
-            color: #4fc3f7;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .video-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px;
-        }
-        
-        .video-item {
-            padding: 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-bottom: 4px;
-            transition: background 0.2s;
-            font-size: 13px;
-            color: #ccc;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .video-item:hover {
-            background: #333;
-        }
-        
-        .video-item.active {
-            background: #1565c0;
+        .sidebar-toggle {
+            background: #444;
+            border: none;
             color: #fff;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
         }
+
+        .sidebar-toggle:hover {
+            background: #555;
+        }
+
+        .sidebar-show-btn {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #333;
+            border: none;
+            color: #fff;
+            padding: 12px 8px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .sidebar-show-btn:hover {
+            background: #444;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        
+
         
         .main-content {
             flex: 1;
@@ -111,12 +118,68 @@
             overflow: hidden;
         }
         
-        video {
+        video, .image-viewer {
             max-width: 100%;
             max-height: 100%;
             width: auto;
             height: auto;
             object-fit: contain;
+        }
+
+        .image-viewer {
+            display: none;
+            user-select: none;
+        }
+
+        .image-viewer img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .video-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .media-item {
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: background 0.2s;
+            font-size: 13px;
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .media-item:hover {
+            background: #333;
+        }
+
+        .media-item.active {
+            background: #1565c0;
+            color: #fff;
+        }
+
+        .media-item .item-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        .media-item .item-type.video {
+            background: #1565c0;
+        }
+
+        .media-item .item-type.image {
+            background: #7b1fa2;
         }
         
         .loading {
@@ -153,7 +216,25 @@
             background: #4fc3f7;
             border-radius: 4px;
             width: 0%;
-            transition: width 0.1s;
+        }
+
+        .progress-handle {
+            position: absolute;
+            top: 50%;
+            right: -6px;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+
+        .progress-container:hover .progress-handle,
+        .progress-container.dragging .progress-handle {
+            opacity: 1;
         }
         
         .progress-container:hover .progress-bar {
@@ -259,15 +340,16 @@
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h3>播放列表</h3>
-            <a href="/" class="back-link">&larr; 返回文件列表</a>
+            <h3 id="sidebarTitle">媒体列表</h3>
+            <button class="sidebar-toggle" id="sidebarToggle" title="收起侧边栏">◀</button>
         </div>
-        <div class="video-list" id="videoList">
+        <div class="video-list" id="mediaList">
             <div style="padding: 20px; color: #666; text-align: center;">加载中...</div>
         </div>
     </div>
+    <button class="sidebar-show-btn" id="sidebarShowBtn" style="display: none;" title="展开侧边栏">▶</button>
     
     <div class="main-content">
         <div class="header">
@@ -275,13 +357,18 @@
         </div>
         
         <div class="player-wrapper">
-            <div class="loading" id="loading">正在加载视频...</div>
+            <div class="loading" id="loading">正在加载...</div>
             <video id="videoPlayer" tabindex="0"></video>
+            <div class="image-viewer" id="imageViewer">
+                <img id="imageEl" src="" alt="">
+            </div>
         </div>
         
-        <div class="controls-bar">
+        <div class="controls-bar" id="videoControls">
             <div class="progress-container" id="progressContainer">
-                <div class="progress-bar" id="progressBar"></div>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-handle"></div>
+                </div>
             </div>
             <div class="controls-row">
                 <button class="nav-btn" id="prevBtn" onclick="playPrev()" title="上一个">&larr; 上一个</button>
@@ -293,181 +380,313 @@
                 <div class="step-info" id="stepInfo">← → 快进退5秒 | J L 快进退10秒 | 空格 播放暂停</div>
             </div>
         </div>
+
+        <div class="controls-bar" id="imageControls" style="display: none;">
+            <div class="controls-row">
+                <button class="nav-btn" id="imgPrevBtn" onclick="showPrev()" title="上一张">&larr; 上一张</button>
+                <div class="time-display" id="imageCounter">1 / 1</div>
+                <button class="nav-btn" id="imgNextBtn" onclick="showNext()" title="下一张">下一张 &rarr;</button>
+                <div class="step-info" id="imageStepInfo">← → 切换图片</div>
+            </div>
+        </div>
     </div>
     
     <script>
+        // DOM 元素
         const video = document.getElementById('videoPlayer');
+        const imageViewer = document.getElementById('imageViewer');
+        const imageEl = document.getElementById('imageEl');
         const loading = document.getElementById('loading');
         const playBtn = document.getElementById('playBtn');
         const timeDisplay = document.getElementById('timeDisplay');
         const stepInfo = document.getElementById('stepInfo');
         const fileNameEl = document.getElementById('fileName');
-        const videoListEl = document.getElementById('videoList');
+        const mediaListEl = document.getElementById('mediaList');
         const progressBar = document.getElementById('progressBar');
         const progressContainer = document.getElementById('progressContainer');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
-        
-        let videoList = [];
+        const imgPrevBtn = document.getElementById('imgPrevBtn');
+        const imgNextBtn = document.getElementById('imgNextBtn');
+        const imageCounter = document.getElementById('imageCounter');
+        const videoControls = document.getElementById('videoControls');
+        const imageControls = document.getElementById('imageControls');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarShowBtn = document.getElementById('sidebarShowBtn');
+
+        // 状态
+        let mediaList = [];
         let currentIndex = -1;
-        
+        let isImageMode = false;
+
         const urlParams = new URLSearchParams(window.location.search);
-        const videoPath = urlParams.get('src');
+        const filePath = urlParams.get('src');
         const sortOrder = urlParams.get('sort') || 'date';
-        
+
+        // 文件类型检测
         function isVideoFile(filename) {
             const ext = filename.split('.').pop().toLowerCase();
             return ['mp4', 'mkv', 'avi', 'webm', 'mov', 'wmv', 'flv', 'm4v', '3gp', 'ogv'].includes(ext);
         }
-        
-        async function loadVideoList() {
-            if (!videoPath) {
-                videoListEl.innerHTML = '<div style="padding: 20px; color: #f44336;">未指定视频文件</div>';
+
+        function isImageFile(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
+        }
+
+        // 侧边栏收缩
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.add('collapsed');
+            sidebarShowBtn.style.display = 'block';
+        });
+
+        sidebarShowBtn.addEventListener('click', function() {
+            sidebar.classList.remove('collapsed');
+            sidebarShowBtn.style.display = 'none';
+        });
+
+        // 加载媒体列表
+        async function loadMediaList() {
+            if (!filePath) {
+                mediaListEl.innerHTML = '<div style="padding: 20px; color: #f44336;">未指定文件</div>';
                 return;
             }
-            
-            const parts = videoPath.split('/');
+
+            const parts = filePath.split('/');
             parts.pop();
             const dirPath = parts.join('/');
-            
+
             try {
                 let url = dirPath ? '/api/files?path=' + encodeURIComponent(dirPath) : '/api/files';
                 url += '&sort=' + sortOrder;
                 const response = await fetch(url);
                 const data = await response.json();
-                
-                // API返回的是数组格式 [{name, path, isDirectory, size, lastModified}]
+
                 const files = Array.isArray(data) ? data : (data.files || []);
-                videoList = files.filter(f => !f.isDirectory && isVideoFile(f.name));
-                renderVideoList();
-                
-                const currentFileName = decodeURIComponent(videoPath.split('/').pop());
-                currentIndex = videoList.findIndex(v => v.name === currentFileName);
+                mediaList = files.filter(f => !f.isDirectory && (isVideoFile(f.name) || isImageFile(f.name)));
+                renderMediaList();
+
+                const currentFileName = decodeURIComponent(filePath.split('/').pop());
+                currentIndex = mediaList.findIndex(m => m.name === currentFileName);
                 updateNavButtons();
             } catch (error) {
-                console.error('加载视频列表失败:', error);
-                videoListEl.innerHTML = '<div style="padding: 20px; color: #f44336;">加载列表失败</div>';
+                console.error('加载媒体列表失败:', error);
+                mediaListEl.innerHTML = '<div style="padding: 20px; color: #f44336;">加载列表失败</div>';
             }
         }
-        
-        function renderVideoList() {
-            if (videoList.length === 0) {
-                videoListEl.innerHTML = '<div style="padding: 20px; color: #666;">当前目录没有其他视频</div>';
+
+        function renderMediaList() {
+            if (mediaList.length === 0) {
+                mediaListEl.innerHTML = '<div style="padding: 20px; color: #666;">当前目录没有媒体文件</div>';
                 return;
             }
-            
-            videoListEl.innerHTML = videoList.map((v, i) => {
+
+            mediaListEl.innerHTML = mediaList.map((m, i) => {
                 const isActive = i === currentIndex;
-                return `<div class="video-item ${isActive ? 'active' : ''}" onclick="playVideo(${i})" title="${v.name}">${v.name}</div>`;
+                const type = isVideoFile(m.name) ? 'video' : 'image';
+                const typeLabel = type === 'video' ? '视频' : '图片';
+                return `<div class="media-item ${isActive ? 'active' : ''}" onclick="showMedia(${i})" title="${m.name}">
+                    <span class="item-type ${type}">${typeLabel}</span>${m.name}
+                </div>`;
             }).join('');
         }
-        
-        function playVideo(index) {
-            if (index < 0 || index >= videoList.length) return;
-            
+
+        function showMedia(index) {
+            if (index < 0 || index >= mediaList.length) return;
+
             currentIndex = index;
-            const v = videoList[index];
-            const parts = videoPath.split('/');
+            const item = mediaList[index];
+            const parts = filePath.split('/');
             parts.pop();
-            const newSrc = parts.join('/') + '/' + encodeURIComponent(v.name);
-            
-            video.src = newSrc;
-            fileNameEl.textContent = v.name;
-            
-            window.history.replaceState({}, '', '/player?src=' + encodeURIComponent(parts.join('/') + '/' + v.name));
-            
-            renderVideoList();
+            const newSrc = parts.join('/') + '/' + encodeURIComponent(item.name);
+
+            if (isImageFile(item.name)) {
+                showImage(newSrc, item.name);
+            } else {
+                showVideo(newSrc, item.name);
+            }
+
+            window.history.replaceState({}, '', '/player?src=' + encodeURIComponent(parts.join('/') + '/' + item.name));
+            renderMediaList();
             updateNavButtons();
+        }
+
+        function showImage(src, name) {
+            isImageMode = true;
+            video.style.display = 'none';
+            imageViewer.style.display = 'flex';
+            videoControls.style.display = 'none';
+            imageControls.style.display = 'block';
+            loading.style.display = 'none';
+            video.pause();
+
+            imageEl.src = src;
+            fileNameEl.textContent = name;
+            updateImageCounter();
+        }
+
+        function showVideo(src, name) {
+            isImageMode = false;
+            video.style.display = 'block';
+            imageViewer.style.display = 'none';
+            videoControls.style.display = 'block';
+            imageControls.style.display = 'none';
+
+            video.src = src;
+            fileNameEl.textContent = name;
             video.play();
         }
-        
-        function playPrev() {
+
+        function showPrev() {
             if (currentIndex > 0) {
-                playVideo(currentIndex - 1);
+                showMedia(currentIndex - 1);
             }
         }
-        
-        function playNext() {
-            if (currentIndex < videoList.length - 1) {
-                playVideo(currentIndex + 1);
+
+        function showNext() {
+            if (currentIndex < mediaList.length - 1) {
+                showMedia(currentIndex + 1);
             }
         }
-        
+
         function updateNavButtons() {
             prevBtn.disabled = currentIndex <= 0;
-            nextBtn.disabled = currentIndex >= videoList.length - 1;
+            nextBtn.disabled = currentIndex >= mediaList.length - 1;
+            imgPrevBtn.disabled = currentIndex <= 0;
+            imgNextBtn.disabled = currentIndex >= mediaList.length - 1;
+            updateImageCounter();
         }
-        
-        if (!videoPath) {
-            loading.innerHTML = '<div class="error">未指定视频文件</div>';
+
+        function updateImageCounter() {
+            imageCounter.textContent = `${currentIndex + 1} / ${mediaList.length}`;
+        }
+
+        // 视频播放控制
+        if (!filePath) {
+            loading.innerHTML = '<div class="error">未指定文件</div>';
         } else {
-            const currentFileName = decodeURIComponent(videoPath.split('/').pop());
+            const currentFileName = decodeURIComponent(filePath.split('/').pop());
             fileNameEl.textContent = currentFileName;
-            
-            video.src = videoPath;
-            
-            video.addEventListener('loadedmetadata', function() {
-                loading.style.display = 'none';
-                updateTimeDisplay();
-                video.focus();
-            });
-            
-            video.addEventListener('error', function() {
-                loading.innerHTML = '<div class="error">视频加载失败，请检查文件是否存在</div>';
-            });
-            
-            video.addEventListener('timeupdate', function() {
-                updateTimeDisplay();
-                updateProgress();
-            });
-            
-            video.addEventListener('play', () => playBtn.textContent = '暂停');
-            video.addEventListener('pause', () => playBtn.textContent = '播放');
-            
-            loadVideoList();
+
+            if (isImageFile(currentFileName)) {
+                showImage(filePath, currentFileName);
+            } else {
+                video.src = filePath;
+
+                video.addEventListener('loadedmetadata', function() {
+                    loading.style.display = 'none';
+                    updateTimeDisplay();
+                    video.focus();
+                });
+
+                video.addEventListener('error', function() {
+                    loading.innerHTML = '<div class="error">视频加载失败，请检查文件是否存在</div>';
+                });
+
+                video.addEventListener('timeupdate', function() {
+                    updateTimeDisplay();
+                    updateProgress();
+                });
+
+                video.addEventListener('play', () => playBtn.textContent = '暂停');
+                video.addEventListener('pause', () => playBtn.textContent = '播放');
+            }
+
+            loadMediaList();
         }
-        
+
         function formatTime(seconds) {
             if (isNaN(seconds)) return '00:00';
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
             const s = Math.floor(seconds % 60);
-            
+
             if (h > 0) {
                 return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
             }
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
-        
+
         function updateTimeDisplay() {
             const current = formatTime(video.currentTime);
             const total = formatTime(video.duration);
             timeDisplay.textContent = `${current} / ${total}`;
         }
-        
+
         function updateProgress() {
             if (video.duration) {
                 const percent = (video.currentTime / video.duration) * 100;
                 progressBar.style.width = percent + '%';
             }
         }
-        
-        progressContainer.addEventListener('click', function(e) {
-            const rect = this.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
+
+        // 进度条拖拽
+        let isDragging = false;
+        let wasPlaying = false;
+
+        function seekToPosition(clientX) {
+            const rect = progressContainer.getBoundingClientRect();
+            let percent = (clientX - rect.left) / rect.width;
+            percent = Math.max(0, Math.min(1, percent));
             video.currentTime = percent * video.duration;
+            updateProgress();
+        }
+
+        progressContainer.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            isDragging = true;
+            wasPlaying = !video.paused;
+            video.pause();
+            progressContainer.classList.add('dragging');
+            seekToPosition(e.clientX);
         });
-        
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            seekToPosition(e.clientX);
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            progressContainer.classList.remove('dragging');
+            if (wasPlaying) video.play();
+        });
+
+        progressContainer.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            isDragging = true;
+            wasPlaying = !video.paused;
+            video.pause();
+            progressContainer.classList.add('dragging');
+            seekToPosition(e.touches[0].clientX);
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            seekToPosition(e.touches[0].clientX);
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            progressContainer.classList.remove('dragging');
+            if (wasPlaying) video.play();
+        });
+
         function rewind(step) {
             video.currentTime = Math.max(0, video.currentTime - step);
             showStepHint(`快退 ${step} 秒`);
         }
-        
+
         function forward(step) {
             video.currentTime = Math.min(video.duration || 0, video.currentTime + step);
             showStepHint(`快进 ${step} 秒`);
         }
-        
+
         function togglePlay() {
             if (video.paused) {
                 video.play();
@@ -475,7 +694,7 @@
                 video.pause();
             }
         }
-        
+
         function showStepHint(text) {
             const original = '← → 快进退5秒 | J L 快进退10秒 | 空格 播放暂停';
             stepInfo.textContent = text;
@@ -485,61 +704,69 @@
                 stepInfo.style.color = '#888';
             }, 800);
         }
-        
+
+        // 键盘快捷键
         document.addEventListener('keydown', function(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            
-            switch(e.key) {
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    rewind(5);
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    forward(5);
-                    break;
-                case ' ':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    togglePlay();
-                    break;
-                case 'j':
-                case 'J':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    rewind(10);
-                    break;
-                case 'l':
-                case 'L':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    forward(10);
-                    break;
-                case 'f':
-                case 'F':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                    } else {
-                        video.requestFullscreen();
-                    }
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    playPrev();
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    e.stopPropagation();
-                    playNext();
-                    break;
+
+            if (isImageMode) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        showPrev();
+                        break;
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        showNext();
+                        break;
+                }
+            } else {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        rewind(5);
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        forward(5);
+                        break;
+                    case ' ':
+                        e.preventDefault();
+                        togglePlay();
+                        break;
+                    case 'j':
+                    case 'J':
+                        e.preventDefault();
+                        rewind(10);
+                        break;
+                    case 'l':
+                    case 'L':
+                        e.preventDefault();
+                        forward(10);
+                        break;
+                    case 'f':
+                    case 'F':
+                        e.preventDefault();
+                        if (document.fullscreenElement) {
+                            document.exitFullscreen();
+                        } else {
+                            video.requestFullscreen();
+                        }
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        showPrev();
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        showNext();
+                        break;
+                }
             }
         });
-        
+
         video.addEventListener('dblclick', function() {
             if (document.fullscreenElement) {
                 document.exitFullscreen();
@@ -547,7 +774,7 @@
                 video.requestFullscreen();
             }
         });
-        
+
         video.addEventListener('click', function() {
             togglePlay();
         });
