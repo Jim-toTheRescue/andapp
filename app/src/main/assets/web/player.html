@@ -815,27 +815,31 @@
         });
 
         // 滚轮/触控板上下滑动切换媒体（类似抖音）
-        let wheelAccum = 0;
         let wheelCooldown = false;
-        const WHEEL_THRESHOLD = 50;
+        let wheelGestureDone = false;
+        let wheelResetTimer = null;
 
         document.querySelector('.player-wrapper').addEventListener('wheel', function(e) {
             e.preventDefault();
             if (wheelCooldown) return;
 
-            wheelAccum += e.deltaY;
-
-            if (wheelAccum > WHEEL_THRESHOLD) {
-                wheelAccum = 0;
-                wheelCooldown = true;
-                showNext();
-                setTimeout(() => { wheelCooldown = false; }, 800);
-            } else if (wheelAccum < -WHEEL_THRESHOLD) {
-                wheelAccum = 0;
-                wheelCooldown = true;
-                showPrev();
-                setTimeout(() => { wheelCooldown = false; }, 800);
+            if (!wheelGestureDone) {
+                wheelGestureDone = true;
+                if (e.deltaY > 15) {
+                    showNext();
+                    wheelCooldown = true;
+                    setTimeout(() => { wheelCooldown = false; }, 600);
+                } else if (e.deltaY < -15) {
+                    showPrev();
+                    wheelCooldown = true;
+                    setTimeout(() => { wheelCooldown = false; }, 600);
+                }
             }
+
+            clearTimeout(wheelResetTimer);
+            wheelResetTimer = setTimeout(() => {
+                wheelGestureDone = false;
+            }, 300);
         }, { passive: false });
     </script>
 </body>
