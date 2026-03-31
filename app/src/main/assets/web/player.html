@@ -818,12 +818,8 @@
         // 滚轮/触控板上下滑动切换媒体（类似抖音）
         let wheelCooldown = false;
 
-        document.addEventListener('wheel', function(e) {
+        function handleWheel(e) {
             if (wheelCooldown) return;
-
-            const wrapper = document.querySelector('.player-wrapper');
-            if (!wrapper || !wrapper.contains(e.target)) return;
-
             e.preventDefault();
             e.stopPropagation();
             wheelCooldown = true;
@@ -837,7 +833,13 @@
             setTimeout(function() {
                 wheelCooldown = false;
             }, 800);
-        }, { passive: false, capture: true });
+        }
+
+        // 在多个元素上绑定确保捕获
+        var pw = document.querySelector('.player-wrapper');
+        pw.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        video.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        imageViewer.addEventListener('wheel', handleWheel, { passive: false, capture: true });
     </script>
 </body>
 </html>
