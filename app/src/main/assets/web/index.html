@@ -424,7 +424,7 @@
                     html += '<div class="file-info">';
                     if (isDir) {
                         html += '<div class="file-name" style="cursor:pointer;color:#1976d2" onclick="loadFiles(this.getAttribute(\'data-path\'))" data-path="' + filePath.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + name + '</div>';
-                    } else if (isVideoFile(name) || isImageFile(name)) {
+                    } else if (isVideoFile(name) || isImageFile(name) || isAudioFile(name)) {
                         html += '<a class="file-name" href="/player?src=' + encodeURIComponent(filePath) + '&sort=' + currentSort + '" target="_blank">' + name + '</a>';
                     } else {
                         html += '<a class="file-name" href="' + filePath + '" target="_blank">' + name + '</a>';
