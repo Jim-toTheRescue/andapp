@@ -76,6 +76,14 @@
             display: none; user-select: none;
             width: 100%; height: 100%;
             align-items: center; justify-content: center;
+            background: #f0f0f0;
+            background-image:
+                linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+                linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+                linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
         .image-viewer img {
             max-width: 100%; max-height: 100%; object-fit: contain;
@@ -479,19 +487,25 @@
             }
         });
 
+        var wheelAccum = 0;
+        var wheelTimer = null;
+
         function handleWheel(e) {
-            if (wheelCooldown) return;
             var pw = document.getElementById('playerWrapper');
             if (!pw || !pw.contains(e.target)) return;
             e.preventDefault();
             e.stopPropagation();
-            wheelCooldown = true;
-            if (e.deltaY > 0 || (e.wheelDelta && e.wheelDelta < 0)) {
-                showNext();
-            } else {
-                showPrev();
-            }
-            setTimeout(function() { wheelCooldown = false; }, 1000);
+
+            wheelAccum += e.deltaY || -e.wheelDelta;
+
+            clearTimeout(wheelTimer);
+            wheelTimer = setTimeout(function() {
+                if (Math.abs(wheelAccum) > 20) {
+                    if (wheelAccum > 0) showNext();
+                    else showPrev();
+                }
+                wheelAccum = 0;
+            }, 200);
         }
         document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
         document.addEventListener('mousewheel', handleWheel, { passive: false, capture: true });
