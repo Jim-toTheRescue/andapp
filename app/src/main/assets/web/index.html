@@ -359,6 +359,11 @@
             const ext = filename.split('.').pop().toLowerCase();
             return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
         }
+
+        function isAudioFile(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'aac', 'wma'].includes(ext);
+        }
         
         function renderBreadcrumb(path) {
             const parts = path ? path.split('/') : [];

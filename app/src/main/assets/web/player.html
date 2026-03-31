@@ -185,6 +185,10 @@
         .media-item .item-type.image {
             background: #7b1fa2;
         }
+
+        .media-item .item-type.audio {
+            background: #e65100;
+        }
         
         .loading {
             color: #888;
@@ -375,11 +379,11 @@
                 </div>
             </div>
             <div class="controls-row">
-                <button class="nav-btn" id="prevBtn" onclick="playPrev()" title="上一个">&larr; 上一个</button>
+                <button class="nav-btn" id="prevBtn" onclick="showPrev()" title="上一个">&larr; 上一个</button>
                 <button class="control-btn rewind" onclick="rewind(5)" title="快退5秒">-5s</button>
                 <button class="control-btn play" id="playBtn" onclick="togglePlay()">播放</button>
                 <button class="control-btn forward" onclick="forward(5)" title="快进5秒">+5s</button>
-                <button class="nav-btn" id="nextBtn" onclick="playNext()" title="下一个">下一个 &rarr;</button>
+                <button class="nav-btn" id="nextBtn" onclick="showNext()" title="下一个">下一个 &rarr;</button>
                 <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
                 <div class="step-info" id="stepInfo">← → 快进退5秒 | ↑ ↓ 切换 | F 全屏</div>
             </div>
@@ -440,6 +444,11 @@
             return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext);
         }
 
+        function isAudioFile(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['mp3', 'wav', 'flac', 'm4a', 'ogg', 'aac', 'wma'].includes(ext);
+        }
+
         // 侧边栏收缩
         sidebarToggle.addEventListener('click', function() {
             sidebar.classList.add('collapsed');
@@ -469,7 +478,7 @@
                 const data = await response.json();
 
                 const files = Array.isArray(data) ? data : (data.files || []);
-                mediaList = files.filter(f => !f.isDirectory && (isVideoFile(f.name) || isImageFile(f.name)));
+                mediaList = files.filter(f => !f.isDirectory && (isVideoFile(f.name) || isImageFile(f.name) || isAudioFile(f.name)));
                 renderMediaList();
 
                 const currentFileName = decodeURIComponent(filePath.split('/').pop());
@@ -489,8 +498,17 @@
 
             mediaListEl.innerHTML = mediaList.map((m, i) => {
                 const isActive = i === currentIndex;
-                const type = isVideoFile(m.name) ? 'video' : 'image';
-                const typeLabel = type === 'video' ? '视频' : '图片';
+                let type, typeLabel;
+                if (isVideoFile(m.name)) {
+                    type = 'video';
+                    typeLabel = '视频';
+                } else if (isImageFile(m.name)) {
+                    type = 'image';
+                    typeLabel = '图片';
+                } else {
+                    type = 'audio';
+                    typeLabel = '音频';
+                }
                 return `<div class="media-item ${isActive ? 'active' : ''}" onclick="showMedia(${i})" title="${m.name}">
                     <span class="item-type ${type}">${typeLabel}</span>${m.name}
                 </div>`;
@@ -502,17 +520,15 @@
 
             currentIndex = index;
             const item = mediaList[index];
-            const parts = filePath.split('/');
-            parts.pop();
-            const newSrc = parts.join('/') + '/' + encodeURIComponent(item.name);
+            const newSrc = item.path || (filePath.substring(0, filePath.lastIndexOf('/') + 1) + item.name);
 
             if (isImageFile(item.name)) {
                 showImage(newSrc, item.name);
             } else {
-                showVideo(newSrc, item.name);
+                showVideo(newSrc, item.name, isAudioFile(item.name));
             }
 
-            window.history.replaceState({}, '', '/player?src=' + encodeURIComponent(parts.join('/') + '/' + item.name));
+            window.history.replaceState({}, '', '/player?src=' + encodeURIComponent(newSrc));
             renderMediaList();
             updateNavButtons();
         }
@@ -536,14 +552,17 @@
             }
         }
 
-        function showVideo(src, name) {
+        function showVideo(src, name, isAudio = false) {
             const wasFullscreen = !!document.fullscreenElement;
+            if (wasFullscreen) {
+                document.exitFullscreen();
+            }
             isImageMode = false;
-            video.style.display = 'block';
+            video.style.display = isAudio ? 'none' : 'block';
             imageViewer.style.display = 'none';
             videoControls.style.display = 'block';
             imageControls.style.display = 'none';
-            loading.style.display = 'flex';
+            loading.style.display = isAudio ? 'none' : 'flex';
 
             video.pause();
             video.src = src;
@@ -555,10 +574,6 @@
                 updateProgress();
                 video.play();
             };
-
-            if (wasFullscreen) {
-                video.requestFullscreen();
-            }
         }
 
         function showPrev() {
@@ -594,6 +609,8 @@
 
             if (isImageFile(currentFileName)) {
                 showImage(filePath, currentFileName);
+            } else if (isAudioFile(currentFileName)) {
+                showVideo(filePath, currentFileName, true);
             } else {
                 video.src = filePath;
 
@@ -796,6 +813,20 @@
         video.addEventListener('click', function() {
             togglePlay();
         });
+
+        // 滚轮/触控板上下滑动切换媒体
+        let wheelTimeout = null;
+        document.querySelector('.player-wrapper').addEventListener('wheel', function(e) {
+            e.preventDefault();
+            if (wheelTimeout) return;
+            wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 500);
+
+            if (e.deltaY > 0) {
+                showNext();
+            } else if (e.deltaY < 0) {
+                showPrev();
+            }
+        }, { passive: false });
     </script>
 </body>
 </html>
