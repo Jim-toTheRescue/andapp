@@ -404,10 +404,11 @@
             video.currentTime = Math.min(video.duration || 0, video.currentTime + step);
         }
 
+        var playerWrapper = document.getElementById('playerWrapper');
+
         function toggleFullscreen() {
-            var el = isImageMode ? imageViewer : video;
             if (document.fullscreenElement) document.exitFullscreen();
-            else el.requestFullscreen();
+            else playerWrapper.requestFullscreen();
         }
 
         prevBtn.addEventListener('click', showPrev);
