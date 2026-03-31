@@ -576,12 +576,14 @@
             video.pause();
             video.src = src;
             fileNameEl.textContent = name;
+            playBtn.textContent = '暂停';
 
             video.onloadedmetadata = function() {
                 loading.style.display = 'none';
                 updateTimeDisplay();
                 updateProgress();
                 video.play();
+                playBtn.textContent = '暂停';
                 if (wasFullscreen) {
                     video.requestFullscreen();
                 }
@@ -822,6 +824,10 @@
             toggleFullscreen();
         });
 
+        overlay.addEventListener('dblclick', function() {
+            toggleFullscreen();
+        });
+
         video.addEventListener('click', function() {
             togglePlay();
         });
@@ -843,7 +849,7 @@
 
             setTimeout(function() {
                 wheelCooldown = false;
-            }, 800);
+            }, 1200);
         }
 
         // 在遮罩层上绑定事件
