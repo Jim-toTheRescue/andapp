@@ -814,17 +814,27 @@
             togglePlay();
         });
 
-        // 滚轮/触控板上下滑动切换媒体
-        let wheelTimeout = null;
+        // 滚轮/触控板上下滑动切换媒体（类似抖音）
+        let wheelAccum = 0;
+        let wheelCooldown = false;
+        const WHEEL_THRESHOLD = 50;
+
         document.querySelector('.player-wrapper').addEventListener('wheel', function(e) {
             e.preventDefault();
-            if (wheelTimeout) return;
-            wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 500);
+            if (wheelCooldown) return;
 
-            if (e.deltaY > 0) {
+            wheelAccum += e.deltaY;
+
+            if (wheelAccum > WHEEL_THRESHOLD) {
+                wheelAccum = 0;
+                wheelCooldown = true;
                 showNext();
-            } else if (e.deltaY < 0) {
+                setTimeout(() => { wheelCooldown = false; }, 800);
+            } else if (wheelAccum < -WHEEL_THRESHOLD) {
+                wheelAccum = 0;
+                wheelCooldown = true;
                 showPrev();
+                setTimeout(() => { wheelCooldown = false; }, 800);
             }
         }, { passive: false });
     </script>
