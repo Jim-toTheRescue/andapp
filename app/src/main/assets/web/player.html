@@ -818,8 +818,19 @@
         // 滚轮/触控板上下滑动切换媒体（类似抖音）
         let wheelCooldown = false;
 
-        function handleWheel(e) {
+        document.addEventListener('wheel', function(e) {
             if (wheelCooldown) return;
+
+            // 检查鼠标是否在播放区域内
+            var pw = document.querySelector('.player-wrapper');
+            var rect = pw.getBoundingClientRect();
+            var x = e.clientX;
+            var y = e.clientY;
+
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                return;
+            }
+
             e.preventDefault();
             e.stopPropagation();
             wheelCooldown = true;
@@ -833,13 +844,7 @@
             setTimeout(function() {
                 wheelCooldown = false;
             }, 800);
-        }
-
-        // 在多个元素上绑定确保捕获
-        var pw = document.querySelector('.player-wrapper');
-        pw.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-        video.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-        imageViewer.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        }, { passive: false, capture: true });
     </script>
 </body>
 </html>
