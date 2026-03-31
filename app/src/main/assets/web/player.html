@@ -829,54 +829,13 @@
         // 滚轮/触控板上下滑动切换媒体（类似抖音）
         let wheelCooldown = false;
 
-        document.addEventListener('wheel', function(e) {
+        function handleWheel(e) {
             if (wheelCooldown) return;
-
-            const wrapper = document.getElementById('playerWrapper');
-            if (!wrapper) return;
-
-            const rect = wrapper.getBoundingClientRect();
-            const x = e.clientX;
-            const y = e.clientY;
-
-            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                return;
-            }
-
             e.preventDefault();
             e.stopPropagation();
             wheelCooldown = true;
 
-            if (e.deltaY > 0) {
-                showNext();
-            } else if (e.deltaY < 0) {
-                showPrev();
-            }
-
-            setTimeout(function() {
-                wheelCooldown = false;
-            }, 800);
-        }, { passive: false, capture: true });
-
-        document.addEventListener('mousewheel', function(e) {
-            if (wheelCooldown) return;
-
-            const wrapper = document.getElementById('playerWrapper');
-            if (!wrapper) return;
-
-            const rect = wrapper.getBoundingClientRect();
-            const x = e.clientX;
-            const y = e.clientY;
-
-            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                return;
-            }
-
-            e.preventDefault();
-            e.stopPropagation();
-            wheelCooldown = true;
-
-            if (e.wheelDelta < 0) {
+            if (e.deltaY > 0 || e.wheelDelta < 0) {
                 showNext();
             } else {
                 showPrev();
@@ -885,7 +844,14 @@
             setTimeout(function() {
                 wheelCooldown = false;
             }, 800);
-        }, { passive: false, capture: true });
+        }
+
+        // 在遮罩层上绑定事件
+        var overlay = document.getElementById('wheelOverlay');
+        if (overlay) {
+            overlay.addEventListener('wheel', handleWheel, { passive: false });
+            overlay.addEventListener('mousewheel', handleWheel, { passive: false });
+        }
     </script>
 </body>
 </html>
