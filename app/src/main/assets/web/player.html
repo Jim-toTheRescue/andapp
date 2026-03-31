@@ -819,14 +819,11 @@
         let wheelGestureDone = false;
         let wheelResetTimer = null;
 
-        document.addEventListener('wheel', function(e) {
-            if (wheelCooldown) return;
-
-            const wrapper = document.querySelector('.player-wrapper');
-            const rect = wrapper.getBoundingClientRect();
-            if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) return;
-
+        const playerWrapper = document.querySelector('.player-wrapper');
+        playerWrapper.addEventListener('wheel', function(e) {
             e.preventDefault();
+            e.stopPropagation();
+            if (wheelCooldown) return;
 
             if (!wheelGestureDone) {
                 wheelGestureDone = true;
