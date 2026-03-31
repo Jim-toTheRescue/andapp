@@ -576,18 +576,35 @@
             video.pause();
             video.src = src;
             fileNameEl.textContent = name;
-            playBtn.textContent = '暂停';
+            playBtn.textContent = '播放';
 
             video.onloadedmetadata = function() {
                 loading.style.display = 'none';
                 updateTimeDisplay();
                 updateProgress();
                 video.play();
-                playBtn.textContent = '暂停';
-                if (wasFullscreen) {
-                    video.requestFullscreen();
-                }
             };
+
+            video.onplay = function() {
+                playBtn.textContent = '暂停';
+            };
+
+            video.onpause = function() {
+                playBtn.textContent = '播放';
+            };
+
+            video.ontimeupdate = function() {
+                updateTimeDisplay();
+                updateProgress();
+            };
+
+            video.onerror = function() {
+                loading.innerHTML = '<div class="error">视频加载失败，请检查文件是否存在</div>';
+            };
+
+            if (wasFullscreen) {
+                video.requestFullscreen();
+            }
         }
 
         function showPrev() {
@@ -626,25 +643,7 @@
             } else if (isAudioFile(currentFileName)) {
                 showVideo(filePath, currentFileName, true);
             } else {
-                video.src = filePath;
-
-                video.addEventListener('loadedmetadata', function() {
-                    loading.style.display = 'none';
-                    updateTimeDisplay();
-                    video.focus();
-                });
-
-                video.addEventListener('error', function() {
-                    loading.innerHTML = '<div class="error">视频加载失败，请检查文件是否存在</div>';
-                });
-
-                video.addEventListener('timeupdate', function() {
-                    updateTimeDisplay();
-                    updateProgress();
-                });
-
-                video.addEventListener('play', () => playBtn.textContent = '暂停');
-                video.addEventListener('pause', () => playBtn.textContent = '播放');
+                showVideo(filePath, currentFileName, false);
             }
 
             loadMediaList();
