@@ -118,7 +118,7 @@
             overflow: hidden;
         }
         
-        video, .image-viewer {
+        video {
             max-width: 100%;
             max-height: 100%;
             width: auto;
@@ -129,6 +129,10 @@
         .image-viewer {
             display: none;
             user-select: none;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
         }
 
         .image-viewer img {
@@ -377,7 +381,7 @@
                 <button class="control-btn forward" onclick="forward(5)" title="快进5秒">+5s</button>
                 <button class="nav-btn" id="nextBtn" onclick="playNext()" title="下一个">下一个 &rarr;</button>
                 <div class="time-display" id="timeDisplay">00:00 / 00:00</div>
-                <div class="step-info" id="stepInfo">← → 快进退5秒 | J L 快进退10秒 | 空格 播放暂停</div>
+                <div class="step-info" id="stepInfo">← → 快进退5秒 | ↑ ↓ 切换 | F 全屏</div>
             </div>
         </div>
 
@@ -386,7 +390,8 @@
                 <button class="nav-btn" id="imgPrevBtn" onclick="showPrev()" title="上一张">&larr; 上一张</button>
                 <div class="time-display" id="imageCounter">1 / 1</div>
                 <button class="nav-btn" id="imgNextBtn" onclick="showNext()" title="下一张">下一张 &rarr;</button>
-                <div class="step-info" id="imageStepInfo">← → 切换图片</div>
+                <button class="control-btn" onclick="toggleFullscreen()" title="全屏 F">全屏</button>
+                <div class="step-info" id="imageStepInfo">↑ ↓ 切换 | F 全屏</div>
             </div>
         </div>
     </div>
@@ -696,7 +701,7 @@
         }
 
         function showStepHint(text) {
-            const original = '← → 快进退5秒 | J L 快进退10秒 | 空格 播放暂停';
+            const original = '← → 快进退5秒 | ↑ ↓ 切换 | F 全屏';
             stepInfo.textContent = text;
             stepInfo.style.color = '#4fc3f7';
             setTimeout(() => {
@@ -709,20 +714,23 @@
         document.addEventListener('keydown', function(e) {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-            if (isImageMode) {
-                switch(e.key) {
-                    case 'ArrowLeft':
-                    case 'ArrowUp':
-                        e.preventDefault();
-                        showPrev();
-                        break;
-                    case 'ArrowRight':
-                    case 'ArrowDown':
-                        e.preventDefault();
-                        showNext();
-                        break;
-                }
-            } else {
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    showPrev();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    showNext();
+                    break;
+                case 'f':
+                case 'F':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+            }
+
+            if (!isImageMode) {
                 switch(e.key) {
                     case 'ArrowLeft':
                         e.preventDefault();
@@ -746,26 +754,18 @@
                         e.preventDefault();
                         forward(10);
                         break;
-                    case 'f':
-                    case 'F':
-                        e.preventDefault();
-                        if (document.fullscreenElement) {
-                            document.exitFullscreen();
-                        } else {
-                            video.requestFullscreen();
-                        }
-                        break;
-                    case 'ArrowUp':
-                        e.preventDefault();
-                        showPrev();
-                        break;
-                    case 'ArrowDown':
-                        e.preventDefault();
-                        showNext();
-                        break;
                 }
             }
         });
+
+        function toggleFullscreen() {
+            const el = isImageMode ? imageViewer : video;
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                el.requestFullscreen();
+            }
+        }
 
         video.addEventListener('dblclick', function() {
             if (document.fullscreenElement) {
