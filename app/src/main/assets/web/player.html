@@ -554,9 +554,6 @@
 
         function showVideo(src, name, isAudio = false) {
             const wasFullscreen = !!document.fullscreenElement;
-            if (wasFullscreen) {
-                document.exitFullscreen();
-            }
             isImageMode = false;
             video.style.display = isAudio ? 'none' : 'block';
             imageViewer.style.display = 'none';
@@ -573,6 +570,9 @@
                 updateTimeDisplay();
                 updateProgress();
                 video.play();
+                if (wasFullscreen) {
+                    video.requestFullscreen();
+                }
             };
         }
 
@@ -821,7 +821,7 @@
 
         document.querySelector('.player-wrapper').addEventListener('wheel', function(e) {
             e.preventDefault();
-            if (wheelCooldown || document.fullscreenElement) return;
+            if (wheelCooldown) return;
 
             if (!wheelGestureDone) {
                 wheelGestureDone = true;
