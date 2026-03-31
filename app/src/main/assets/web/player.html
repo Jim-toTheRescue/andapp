@@ -821,7 +821,7 @@
 
         document.querySelector('.player-wrapper').addEventListener('wheel', function(e) {
             e.preventDefault();
-            if (wheelCooldown) return;
+            if (wheelCooldown || document.fullscreenElement) return;
 
             if (!wheelGestureDone) {
                 wheelGestureDone = true;
