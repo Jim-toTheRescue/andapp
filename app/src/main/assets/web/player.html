@@ -323,6 +323,7 @@
         }
 
         function showImage(src, name) {
+            var wasFullscreen = !!document.fullscreenElement;
             isImageMode = true;
             video.style.display = 'none';
             imageViewer.style.display = 'flex';
@@ -334,9 +335,13 @@
             imageEl.src = src;
             fileNameEl.textContent = name;
             updateImageCounter();
+            if (wasFullscreen) {
+                imageViewer.requestFullscreen();
+            }
         }
 
         function showVideo(src, name, isAudio) {
+            var wasFullscreen = !!document.fullscreenElement;
             isImageMode = false;
             video.style.display = isAudio ? 'none' : 'block';
             imageViewer.style.display = 'none';
@@ -356,6 +361,9 @@
                 updateTimeDisplay();
                 updateProgress();
                 video.play();
+                if (wasFullscreen) {
+                    video.requestFullscreen();
+                }
             };
             video.onplay = function() { playBtn.textContent = '暂停'; };
             video.onpause = function() { playBtn.textContent = '播放'; };
