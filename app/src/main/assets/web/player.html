@@ -518,6 +518,7 @@
         }
 
         function showImage(src, name) {
+            const wasFullscreen = !!document.fullscreenElement;
             isImageMode = true;
             video.style.display = 'none';
             imageViewer.style.display = 'flex';
@@ -529,18 +530,35 @@
             imageEl.src = src;
             fileNameEl.textContent = name;
             updateImageCounter();
+
+            if (wasFullscreen) {
+                imageViewer.requestFullscreen();
+            }
         }
 
         function showVideo(src, name) {
+            const wasFullscreen = !!document.fullscreenElement;
             isImageMode = false;
             video.style.display = 'block';
             imageViewer.style.display = 'none';
             videoControls.style.display = 'block';
             imageControls.style.display = 'none';
+            loading.style.display = 'flex';
 
+            video.pause();
             video.src = src;
             fileNameEl.textContent = name;
-            video.play();
+
+            video.onloadedmetadata = function() {
+                loading.style.display = 'none';
+                updateTimeDisplay();
+                updateProgress();
+                video.play();
+            };
+
+            if (wasFullscreen) {
+                video.requestFullscreen();
+            }
         }
 
         function showPrev() {
@@ -768,11 +786,11 @@
         }
 
         video.addEventListener('dblclick', function() {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                video.requestFullscreen();
-            }
+            toggleFullscreen();
+        });
+
+        imageViewer.addEventListener('dblclick', function() {
+            toggleFullscreen();
         });
 
         video.addEventListener('click', function() {
