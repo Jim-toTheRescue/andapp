@@ -845,7 +845,7 @@
             wheelResetTimer = setTimeout(() => {
                 wheelGestureDone = false;
             }, 300);
-        }, { passive: false });
+        }, { passive: false, capture: true });
     </script>
 </body>
 </html>
