@@ -816,41 +816,28 @@
 
         // 滚轮/触控板上下滑动切换媒体（类似抖音）
         let wheelCooldown = false;
-        let wheelAccum = 0;
-        let wheelTimeout = null;
 
         function handleWheel(e) {
-            e.preventDefault();
             if (wheelCooldown) return;
+            
+            // 检查事件是否在播放区域内
+            const wrapper = document.querySelector('.player-wrapper');
+            if (!wrapper.contains(e.target)) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
 
-            wheelAccum += e.deltaY;
-
-            // 清除之前的定时器
-            clearTimeout(wheelTimeout);
-
-            // 设置一个短定时器来累积滚轮事件
-            wheelTimeout = setTimeout(() => {
-                // 累积结束后判断方向
-                if (Math.abs(wheelAccum) > 30) {
-                    wheelCooldown = true;
-                    if (wheelAccum > 0) {
-                        showNext();
-                    } else {
-                        showPrev();
-                    }
-                    // 800ms 冷却期
-                    setTimeout(() => {
-                        wheelCooldown = false;
-                        wheelAccum = 0;
-                    }, 800);
-                }
-                wheelAccum = 0;
-            }, 150);
+            wheelCooldown = true;
+            if (e.deltaY > 0) {
+                showNext();
+            } else if (e.deltaY < 0) {
+                showPrev();
+            }
+            setTimeout(() => { wheelCooldown = false; }, 800);
         }
 
-        document.querySelector('.player-wrapper').addEventListener('wheel', handleWheel, { passive: false });
-        video.addEventListener('wheel', handleWheel, { passive: false });
-        imageViewer.addEventListener('wheel', handleWheel, { passive: false });
+        // 使用捕获阶段确保能捕获到事件
+        document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
     </script>
 </body>
 </html>
