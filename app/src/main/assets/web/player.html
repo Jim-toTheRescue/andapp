@@ -489,6 +489,7 @@
 
         var wheelAccum = 0;
         var wheelTimer = null;
+        var wheelLocked = false;
 
         function handleWheel(e) {
             var pw = document.getElementById('playerWrapper');
@@ -498,14 +499,22 @@
 
             wheelAccum += e.deltaY || -e.wheelDelta;
 
-            clearTimeout(wheelTimer);
+            if (wheelTimer) return;
+
             wheelTimer = setTimeout(function() {
+                wheelTimer = null;
+                if (wheelLocked) { wheelAccum = 0; return; }
                 if (Math.abs(wheelAccum) > 20) {
+                    wheelLocked = true;
                     if (wheelAccum > 0) showNext();
                     else showPrev();
+                    setTimeout(function() {
+                        wheelLocked = false;
+                        wheelAccum = 0;
+                    }, 500);
                 }
                 wheelAccum = 0;
-            }, 200);
+            }, 250);
         }
         document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
         document.addEventListener('mousewheel', handleWheel, { passive: false, capture: true });
