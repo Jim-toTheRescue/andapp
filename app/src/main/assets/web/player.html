@@ -316,25 +316,7 @@
             updateNavButtons();
         }
 
-        var pendingFullscreen = null;
-
-        document.addEventListener('fullscreenchange', function() {
-            if (!document.fullscreenElement && pendingFullscreen) {
-                var el = pendingFullscreen;
-                pendingFullscreen = null;
-                setTimeout(function() {
-                    if (el && el.requestFullscreen) {
-                        el.requestFullscreen().catch(function(){});
-                    }
-                }, 100);
-            }
-        });
-
         function showImage(src, name) {
-            if (document.fullscreenElement) {
-                pendingFullscreen = imageViewer;
-                document.exitFullscreen();
-            }
             isImageMode = true;
             video.style.display = 'none';
             imageViewer.style.display = 'flex';
@@ -349,10 +331,6 @@
         }
 
         function showVideo(src, name, isAudio) {
-            if (document.fullscreenElement) {
-                pendingFullscreen = video;
-                document.exitFullscreen();
-            }
             isImageMode = false;
             video.style.display = isAudio ? 'none' : 'block';
             imageViewer.style.display = 'none';
@@ -502,34 +480,6 @@
                 }
             }
         });
-
-        var wheelLocked = false;
-        var wheelDirection = 0;
-
-        function handleWheel(e) {
-            var pw = document.getElementById('playerWrapper');
-            if (!pw || !pw.contains(e.target)) return;
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (wheelLocked) return;
-
-            var delta = e.deltaY || -e.wheelDelta || 0;
-            if (delta === 0) return;
-
-            wheelLocked = true;
-            wheelDirection = delta > 0 ? 1 : -1;
-
-            if (wheelDirection > 0) showNext();
-            else showPrev();
-
-            setTimeout(function() {
-                wheelLocked = false;
-                wheelDirection = 0;
-            }, 600);
-        }
-        document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-        document.addEventListener('mousewheel', handleWheel, { passive: false, capture: true });
 
         if (!filePath) {
             loading.innerHTML = '<div class="error">未指定文件</div>';
