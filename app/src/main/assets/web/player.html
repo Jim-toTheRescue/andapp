@@ -66,6 +66,7 @@
         .wheel-overlay {
             position: absolute; top: 0; left: 0; right: 0; bottom: 0;
             z-index: 10; background: transparent;
+            pointer-events: none;
         }
         video {
             max-width: 100%; max-height: 100%;
@@ -480,6 +481,8 @@
 
         function handleWheel(e) {
             if (wheelCooldown) return;
+            var pw = document.getElementById('playerWrapper');
+            if (!pw || !pw.contains(e.target)) return;
             e.preventDefault();
             e.stopPropagation();
             wheelCooldown = true;
@@ -490,8 +493,8 @@
             }
             setTimeout(function() { wheelCooldown = false; }, 1000);
         }
-        wheelOverlay.addEventListener('wheel', handleWheel, { passive: false });
-        wheelOverlay.addEventListener('mousewheel', handleWheel, { passive: false });
+        document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        document.addEventListener('mousewheel', handleWheel, { passive: false, capture: true });
 
         if (!filePath) {
             loading.innerHTML = '<div class="error">未指定文件</div>';
