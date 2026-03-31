@@ -119,6 +119,16 @@
             overflow: hidden;
         }
         
+        .wheel-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10;
+            background: transparent;
+        }
+        
         video {
             max-width: 100%;
             max-height: 100%;
@@ -365,12 +375,13 @@
             <div class="file-name" id="fileName">加载中...</div>
         </div>
         
-        <div class="player-wrapper">
+        <div class="player-wrapper" id="playerWrapper">
             <div class="loading" id="loading">正在加载...</div>
             <video id="videoPlayer" tabindex="0"></video>
             <div class="image-viewer" id="imageViewer">
                 <img id="imageEl" src="" alt="">
             </div>
+            <div class="wheel-overlay" id="wheelOverlay"></div>
         </div>
         
         <div class="controls-bar" id="videoControls">
@@ -821,12 +832,14 @@
         document.addEventListener('wheel', function(e) {
             if (wheelCooldown) return;
 
-            // 检查鼠标是否在播放区域内
-            var pw = document.querySelector('.player-wrapper');
-            var rect = pw.getBoundingClientRect();
-            var x = e.clientX;
-            var y = e.clientY;
+            const wrapper = document.getElementById('playerWrapper');
+            if (!wrapper) return;
+            
+            const rect = wrapper.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
 
+            // 检查鼠标是否在播放区域内
             if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
                 return;
             }
