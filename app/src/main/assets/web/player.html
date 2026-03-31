@@ -819,11 +819,6 @@
 
         function handleWheel(e) {
             if (wheelCooldown) return;
-            
-            // 检查事件是否在播放区域内
-            const wrapper = document.querySelector('.player-wrapper');
-            if (!wrapper.contains(e.target)) return;
-            
             e.preventDefault();
             e.stopPropagation();
 
@@ -836,8 +831,11 @@
             setTimeout(() => { wheelCooldown = false; }, 800);
         }
 
-        // 使用捕获阶段确保能捕获到事件
-        document.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        // 直接在player-wrapper及其子元素上绑定
+        const pw = document.querySelector('.player-wrapper');
+        pw.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        video.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        imageViewer.addEventListener('wheel', handleWheel, { passive: false, capture: true });
     </script>
 </body>
 </html>
