@@ -324,6 +324,7 @@
 
         function showImage(src, name) {
             var wasFullscreen = !!document.fullscreenElement;
+            if (wasFullscreen) document.exitFullscreen();
             isImageMode = true;
             video.style.display = 'none';
             imageViewer.style.display = 'flex';
@@ -336,12 +337,13 @@
             fileNameEl.textContent = name;
             updateImageCounter();
             if (wasFullscreen) {
-                imageViewer.requestFullscreen();
+                setTimeout(function() { imageViewer.requestFullscreen(); }, 50);
             }
         }
 
         function showVideo(src, name, isAudio) {
             var wasFullscreen = !!document.fullscreenElement;
+            if (wasFullscreen) document.exitFullscreen();
             isImageMode = false;
             video.style.display = isAudio ? 'none' : 'block';
             imageViewer.style.display = 'none';
@@ -362,7 +364,7 @@
                 updateProgress();
                 video.play();
                 if (wasFullscreen) {
-                    video.requestFullscreen();
+                    setTimeout(function() { video.requestFullscreen(); }, 50);
                 }
             };
             video.onplay = function() { playBtn.textContent = '暂停'; };
