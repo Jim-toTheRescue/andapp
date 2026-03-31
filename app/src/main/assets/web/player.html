@@ -834,12 +834,11 @@
 
             const wrapper = document.getElementById('playerWrapper');
             if (!wrapper) return;
-            
+
             const rect = wrapper.getBoundingClientRect();
             const x = e.clientX;
             const y = e.clientY;
 
-            // 检查鼠标是否在播放区域内
             if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
                 return;
             }
@@ -851,6 +850,35 @@
             if (e.deltaY > 0) {
                 showNext();
             } else if (e.deltaY < 0) {
+                showPrev();
+            }
+
+            setTimeout(function() {
+                wheelCooldown = false;
+            }, 800);
+        }, { passive: false, capture: true });
+
+        document.addEventListener('mousewheel', function(e) {
+            if (wheelCooldown) return;
+
+            const wrapper = document.getElementById('playerWrapper');
+            if (!wrapper) return;
+
+            const rect = wrapper.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+
+            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+            wheelCooldown = true;
+
+            if (e.wheelDelta < 0) {
+                showNext();
+            } else {
                 showPrev();
             }
 
